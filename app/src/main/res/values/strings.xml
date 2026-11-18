@@ -1,0 +1,16 @@
+<resources>
+    <string name="service_description">轻跳通过无障碍识别开屏和浏览广告的关闭按钮，确认后执行点击。画面识别在本机内存中临时分析截图。可在首页暂停自动处理，或在系统无障碍设置中停用轻跳。</string>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#5245AD</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#F5F3FA</item>
+        <item name="android:navigationBarColor">#F5F3FA</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#F5F3FA</item>
+    </style>
+    <item type="id" name="test_skip" />
+    <item type="id" name="test_close" />
+    <item type="id" name="test_countdown" />
+</resources>
