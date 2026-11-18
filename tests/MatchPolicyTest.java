@@ -81,6 +81,15 @@ public final class MatchPolicyTest {
         for(int i=1;i<8;i++)gate.record("target"+i,i*2000);
         check(!gate.allows("ninth",20000),"rate limit");
         check(gate.allows("later",61000),"rate limit expires");
+        ClickGate lazy=new ClickGate();
+        check(!lazy.observe(Arrays.asList("ordinary","content"),key->{throw new AssertionError("idle scan built a control key");},null),
+            "idle scan skips all control key generation");
+        lazy.record("clicked",0);
+        check(lazy.observe(Arrays.asList("clicked","unrelated"),key->key,"clicked")&&!lazy.allows("clicked",2000),
+            "clicked control remains blocked without rechecking its ad label");
+        check(lazy.observe(Arrays.asList("review","hidden"),key->key.equals("hidden")?null:key,"review"),
+            "pending target remains observable even if not blocked");
+        check(lazy.allows("clicked",2000),"control disappearance clears its repeat block");
         ClickGate noticeGate=new ClickGate();noticeGate.record("notice-window-216",0);
         check(!noticeGate.allows("notice-window-215",700),"ordinary targets retain 1800ms cooldown");
         check(!noticeGate.allowsNextNotice("notice-window-215",699),"confirmed next notice still has a minimum interval");

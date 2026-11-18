@@ -19,7 +19,16 @@ public final class MatchPolicy {
     // Reuse the exact platform regex so Android's own whitespace semantics stay unchanged.
     private static final Pattern NORMALIZE=Pattern.compile("[\\s\\u00a0（）()｜|·:：]");
     public static String normalize(String text) {
-        return text==null||text.isEmpty()?"":NORMALIZE.matcher(text).replaceAll("").trim();
+        if(text==null)return "";
+        for(int i=0;i<text.length();i++){
+            char c=text.charAt(i);
+            if(c<=' '||c==':'||c=='('||c==')'||c=='|'||c=='·'||c=='：'||c=='（'||c=='）'||c=='｜'
+                ||c=='\u0085'||c=='\u180e'||Character.isWhitespace(c)||Character.isSpaceChar(c)){
+                // Keep the platform matcher authoritative for separators and trimming.
+                return NORMALIZE.matcher(text).replaceAll("").trim();
+            }
+        }
+        return text;
     }
     public static boolean isSkipText(String text) {
         return SKIP.matcher(normalize(text)).matches();
@@ -56,12 +65,20 @@ public final class MatchPolicy {
     /** Native actions for this app are unsafe; only its verified screenshot path may act. */
     public static boolean requiresVisualSkip(String pkg){return "com.weilaishanhai.oopz".equals(pkg);}
     public static boolean isAdEvidence(String text, String id) {
+        return isAdLabel(text)||isAdId(id);
+    }
+    static boolean isAdEvidence(String text,String description,String id){
+        return isAdLabel(text)||isAdLabel(description)||isAdId(id);
+    }
+    private static boolean isAdLabel(String text){
         String value = normalize(text);
-        if (value.equals("广告") || value.equals("廣告") || value.equalsIgnoreCase("ad") || value.equalsIgnoreCase("advertisement")
+        return value.equals("广告") || value.equals("廣告") || value.equalsIgnoreCase("ad") || value.equalsIgnoreCase("advertisement")
                 || value.equals("互动广告") || value.equals("互動廣告")
-                || AD_JUMP.matcher(value).matches()
+                || value.startsWith("点击跳转详情")&&AD_JUMP.matcher(value).matches()
                 || value.startsWith("广告剩余") || value.equals("广告详情")
-                || value.equals("广告由第三方提供") || value.equals("广告由第三方提供，请注意甄别")) return true;
+                || value.equals("广告由第三方提供") || value.equals("广告由第三方提供，请注意甄别");
+    }
+    private static boolean isAdId(String id){
         String low = id == null ? "" : id.toLowerCase(Locale.ROOT);
         return low.contains("tt_splash_ad_logo") || low.contains("gdt_ad_logo")
             || low.contains("ksad_splash_logo") || low.contains("splash_ad_logo")

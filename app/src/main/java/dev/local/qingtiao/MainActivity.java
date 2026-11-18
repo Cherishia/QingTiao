@@ -164,7 +164,7 @@ public final class MainActivity extends Activity {
         LinearLayout history=card();LinearLayout historyHeading=heading(history,"最近记录");
         link(historyHeading,"抓取记录",this::advertReport);
         recentActions=text("",13,MUTED,false);gap(history,5);history.addView(recentActions);
-        TextView footer=text("轻跳 0.5.35",12,MUTED,false);footer.setGravity(Gravity.CENTER);content.addView(footer);
+        TextView footer=text("轻跳 0.5.36",12,MUTED,false);footer.setGravity(Gravity.CENTER);content.addView(footer);
         updateStatus();updateActivity();updateExclusions();
     }
     private void setRecoveryReminder(boolean enabled){

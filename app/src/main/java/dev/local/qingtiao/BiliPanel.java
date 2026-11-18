@@ -16,6 +16,23 @@ public final class BiliPanel {
         Hint hint;
         boolean blocked,competing;
     }
+    static final class Inspection {
+        static final Inspection NONE=new Inspection(null,false,false);
+        final Hint hint;
+        final boolean nativeEvidence,pixelLabelContext;
+        Inspection(Hint hint,boolean nativeEvidence,boolean pixelLabelContext){
+            this.hint=hint;
+            this.nativeEvidence=nativeEvidence;
+            this.pixelLabelContext=pixelLabelContext;
+        }
+    }
+    /** Reuses the native scope only within this scan. A later action still reads a fresh tree. */
+    static Inspection inspect(List<AdMatcher.Node> nodes,int w,int h,boolean visual){
+        if(!eligible(nodes,w,h))return Inspection.NONE;
+        Scope current=scope(nodes,w,h);
+        boolean nativeEvidence=visual&&nativeEvidence(nodes,w,h,current);
+        return new Inspection(current.hint,nativeEvidence,visual&&!nativeEvidence&&pixelLabelContext(nodes,current));
+    }
     private static boolean active(AdMatcher.Node n){return n.visible&&n.enabled&&!n.password&&!n.editable&&!n.checkable;}
     private static boolean inside(AdMatcher.Node n,AdMatcher.Node b){return n.right>n.left&&n.bottom>n.top&&n.left>=b.left&&n.top>=b.top&&n.right<=b.right&&n.bottom<=b.bottom;}
     private static boolean insideScreen(AdMatcher.Node n,int w,int h){return n.right>n.left&&n.bottom>n.top&&n.left>=0&&n.top>=0&&n.right<=w&&n.bottom<=h;}
@@ -138,12 +155,17 @@ public final class BiliPanel {
     }
     public static boolean canProbe(List<AdMatcher.Node> nodes,int w,int h){
         if(!eligible(nodes,w,h))return false;
-        Scope s=scope(nodes,w,h);
-        return !s.blocked&&(s.hint!=null||localizedEvidence(nodes,w,h,0)||inlineVideoEvidence(nodes,w,h,0)||flatPauseEvidence(nodes,w,h));
+        return nativeEvidence(nodes,w,h,scope(nodes,w,h));
+    }
+    private static boolean nativeEvidence(List<AdMatcher.Node> nodes,int w,int h,Scope scope){
+        return !scope.blocked&&(scope.hint!=null||localizedEvidence(nodes,w,h,0)
+            ||inlineVideoEvidence(nodes,w,h,0)||flatPauseEvidence(nodes,w,h));
     }
     /** A drawn tree can justify a bounded probe, while the frames must establish the ad. */
     static boolean drawnContext(List<AdMatcher.Node> nodes,int w,int h){
-        if(!eligible(nodes,w,h))return false;
+        return eligible(nodes,w,h)&&hasUnlabelledRenderer(nodes);
+    }
+    private static boolean hasUnlabelledRenderer(List<AdMatcher.Node> nodes){
         boolean renderer=false;
         for(AdMatcher.Node n:nodes){
             if(!n.visible)continue;
@@ -153,8 +175,11 @@ public final class BiliPanel {
         return renderer;
     }
     static boolean pixelLabelContext(List<AdMatcher.Node> nodes,int w,int h){
-        if(drawnContext(nodes,w,h))return true;
-        if(!eligible(nodes,w,h)||scope(nodes,w,h).blocked)return false;
+        return eligible(nodes,w,h)&&pixelLabelContext(nodes,scope(nodes,w,h));
+    }
+    private static boolean pixelLabelContext(List<AdMatcher.Node> nodes,Scope scope){
+        if(hasUnlabelledRenderer(nodes))return true;
+        if(scope.blocked)return false;
         boolean disclosure=false,action=false;
         for(AdMatcher.Node n:nodes){
             if(!active(n))continue;
@@ -168,7 +193,7 @@ public final class BiliPanel {
         if(!eligible(nodes,w,h))return "控件树过大、包含敏感控件或方向不适用";
         Scope current=scope(nodes,w,h);
         if(current.competing)return "多个原生广告面板范围重叠";
-        boolean context=!current.blocked&&(pixelLabelContext(nodes,w,h)||RenderedAdPanel.visibleControls(nodes,w,h)>0);
+        boolean context=!current.blocked&&(pixelLabelContext(nodes,current)||RenderedAdPanel.visibleControls(nodes,w,h)>0);
         return RenderedAdPanel.targetProblem(nodes,w,h,x,y,labelX,labelY,context);
     }
 

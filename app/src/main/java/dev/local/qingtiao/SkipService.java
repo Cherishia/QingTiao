@@ -161,7 +161,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
         prefs=getSharedPreferences(LocalLog.PREFS,0);prefs.registerOnSharedPreferenceChangeListener(this);
         connected=true;instance=this;refreshExclusions();
         ServiceRecovery.connected(this);
-        serviceVersion="0.5.35";sessionStarted=new java.text.SimpleDateFormat("MM-dd HH:mm:ss",java.util.Locale.CHINA).format(new java.util.Date());
+        serviceVersion="0.5.36";sessionStarted=new java.text.SimpleDateFormat("MM-dd HH:mm:ss",java.util.Locale.CHINA).format(new java.util.Date());
         AccessibilityServiceInfo info=getServiceInfo();
         frameAccess=canReadFrames(info);
         if(info!=null) {
@@ -183,7 +183,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             receiverRegistered=true;
         }
         prefs.edit().putLong("service_ui",SystemClock.elapsedRealtimeNanos()).apply();
-        LocalLog.add(this,"JUMP 0.5.35 服务已连接 · "+connectionDetails+" · Android "+Build.VERSION.RELEASE+" · "+Build.MANUFACTURER+" "+Build.MODEL);
+        LocalLog.add(this,"JUMP 0.5.36 服务已连接 · "+connectionDetails+" · Android "+Build.VERSION.RELEASE+" · "+Build.MANUFACTURER+" "+Build.MODEL);
     }
     /** The home screen invokes this only after the user confirms disabling the service. */
     static boolean disableAccessibilityFromHome() {
@@ -510,7 +510,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             capturingVisual=false;visualReview.clearScene();timedClose.clear();splashActions.reset();wmTouchReview.reset();delayedWatch.reset();picaSequence=false;visualKind=SplashActions.NONE;visualPackage="";startupProbe.reset(now);
             douyuAdSeen=false;
             if("air.tv.douyu.android".equals(pkg)) {
-                actionPackage=pkg;actionDiagnostic="JUMP 0.5.35\n应用："+pkg+"，窗口="+windowId+"\n斗鱼启动采样，尚未提交本应用的点击动作";
+                actionPackage=pkg;actionDiagnostic="JUMP 0.5.36\n应用："+pkg+"，窗口="+windowId+"\n斗鱼启动采样，尚未提交本应用的点击动作";
                 prefs.edit().putString("action_trace",actionDiagnostic).apply();
             }
         }
@@ -585,9 +585,10 @@ public final class SkipService extends AccessibilityService implements SharedPre
             boolean bili="tv.danmaku.bili".equals(pkg);
             boolean biliAd=bili&&!reminder.present&&prefs.getBoolean("browsing",true);
             boolean visualPanel=biliAd&&visualEnabled(false);
-            BiliPanel.Hint panel=biliAd?BiliPanel.find(snapshot,size.x,size.y):null;
-            boolean nativePanelEvidence=visualPanel&&(panel!=null||BiliPanel.canProbe(snapshot,size.x,size.y));
-            boolean drawnPanelContext=visualPanel&&!nativePanelEvidence&&BiliPanel.pixelLabelContext(snapshot,size.x,size.y);
+            BiliPanel.Inspection panelReview=biliAd?BiliPanel.inspect(snapshot,size.x,size.y,visualPanel):BiliPanel.Inspection.NONE;
+            BiliPanel.Hint panel=panelReview.hint;
+            boolean nativePanelEvidence=panelReview.nativeEvidence;
+            boolean drawnPanelContext=panelReview.pixelLabelContext;
             boolean panelEvidence=nativePanelEvidence||drawnPanelContext;
             boolean nativeBlocked=DelayedAdWatch.jm(pkg)||MatchPolicy.requiresVisualSkip(pkg)||oopzOrigin.delegated(pkg,now)||WmSplashVisual.hasControl(snapshot);
             boolean genericPanel=!bili&&!reminder.present&&!nativeBlocked&&visualEnabled(pkg,false)&&!PicaVisual.trusted(pkg);
@@ -628,7 +629,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             if(reminder.present)adActiveUntil=reminder.index>=0&&prefs.getBoolean("gesture_retry",true)&&gate.allows(fingerprint(pkg,snapshot.get(reminder.index)),now)?now+2000:0;
             else if(pending==null&&!visualFollowup.active(now)&&!pixelPairPending)adActiveUntil=0;
             if("tv.danmaku.bili".equals(pkg)&&AdMatcher.biliAdHint(snapshot)&&!pkg.equals(actionPackage)&&pending==null) {
-                actionPackage=pkg;actionDiagnostic="JUMP 0.5.35\n应用："+pkg+"，窗口="+root.getWindowId()+"\n读到广告相关内容，尚未提交本应用的点击动作";
+                actionPackage=pkg;actionDiagnostic="JUMP 0.5.36\n应用："+pkg+"，窗口="+root.getWindowId()+"\n读到广告相关内容，尚未提交本应用的点击动作";
                 prefs.edit().putString("action_trace",actionDiagnostic).apply();
             }
             traceBase=snapshotTrace(pkg,snapshot,choices,size,startupProbe.active(now),reminder)+"\n当前窗口ID="+root.getWindowId()
@@ -639,12 +640,10 @@ public final class SkipService extends AccessibilityService implements SharedPre
                 +(pkg.equals(lastRealEventPkg)?"\n最近事件：产生至到达="+(lastRealEventCreatedAt>0?lastRealEventAt-lastRealEventCreatedAt:-1)
                     +"ms，到达至本次开始="+(scanStartedAt-lastRealEventAt)+"ms（事件年龄，非排队耗时）":"");
             trace(pkg,choices.isEmpty()?"未找到符合规则的按钮":"找到候选，继续校验点击条件",false);
-            Set<String> visible=new HashSet<>();
-            // Keep a clicked button blocked while it is visible, even if its ad label temporarily disappears.
-            for(AdMatcher.Node node:snapshot) if(node.visible) visible.add(fingerprint(pkg,node));
-            gate.observe(visible);
+            Pending review=pending;
+            boolean targetVisible=gate.observe(snapshot,node->node.visible?fingerprint(pkg,node):null,review==null?null:review.key);
             now=SystemClock.uptimeMillis();
-            if(pending!=null && reviewClick(pkg,snapshot,choices,visible,root.getWindowId(),refs,size)) return;
+            if(review!=null&&reviewClick(pkg,snapshot,choices,targetVisible,root.getWindowId(),refs,size))return;
             int selected=-1;
             for(int index:choices) if(gate.allows(fingerprint(pkg,snapshot.get(index)),now)) {selected=index;break;}
             if(selected<0) {
@@ -684,7 +683,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             if(explicitLabel&&!prefs.getBoolean("gesture_retry",true)) {trace(pkg,"明确跳过广告标签需要模拟触摸，但此开关已关闭，未点击",false);return;}
             now=SystemClock.uptimeMillis();gate.record(fingerprint(pkg,node),now);busy=true;
             pending=new Pending(pkg,fingerprint(pkg,node),traceBase,root.getWindowId(),now,target,dismissMode,nativeSplash,nativePauseTarget);
-            actionPackage=pkg;actionDiagnostic="JUMP 0.5.35\n应用："+pkg+"，窗口="+root.getWindowId()
+            actionPackage=pkg;actionDiagnostic="JUMP 0.5.36\n应用："+pkg+"，窗口="+root.getWindowId()
                 +"\n目标位置="+current.toShortString();
             if(dismissMode)actionDiagnostic+="\n目标方式=关闭模式提醒弹窗，仅触摸明确中性按钮";
             else if(nativeSplash)actionDiagnostic+="\n目标方式=原生开屏跳过文字、当前按钮和独立开屏证据核验，不等待画面探测，不调用父节点";
@@ -745,12 +744,13 @@ public final class SkipService extends AccessibilityService implements SharedPre
             if(AdMatcher.timedSplashSkip(n,size.x,size.y,startup,pkg))timedMatches++;
             if(AdMatcher.explicitSplashSkip(n,size.x,size.y,startup))explicitMatches++;
             if(n.visible&&n.parent>=0)count++;if(n.evidence())ads++;
-            boolean possible=MatchPolicy.isSkipText(n.text)||MatchPolicy.isSkipText(n.desc)
+            boolean textSkip=MatchPolicy.isSkipText(n.text),descSkip=!textSkip&&MatchPolicy.isSkipText(n.desc);
+            boolean possible=textSkip||descSkip
                 ||(MatchPolicy.isCountdownId(n.id)&&(MatchPolicy.isCountdownText(n.text)||MatchPolicy.isCountdownText(n.desc)));
             if(possible) {
                 skip++;
-                String label=MatchPolicy.isSkipText(n.text)?n.text:MatchPolicy.isSkipText(n.desc)?n.desc:MatchPolicy.isCountdownText(n.text)?n.text:n.desc;
-                if(skip<=5) buttons.append("\n按钮 ").append(skip).append("：").append(label)
+                if(skip<=5) buttons.append("\n按钮 ").append(skip).append("：")
+                    .append(textSkip?n.text:descSkip?n.desc:MatchPolicy.isCountdownText(n.text)?n.text:n.desc)
                     .append("，ID=").append(n.id).append("，可见=").append(n.visible).append("，可点击=").append(n.clickable)
                     .append("，位置=").append(n.left).append(',').append(n.top).append(',').append(n.right).append(',').append(n.bottom);
             }
@@ -851,14 +851,14 @@ public final class SkipService extends AccessibilityService implements SharedPre
         } catch(RuntimeException error) {actionStep(pkg,"FAST_PROBE：读取异常 "+error.getClass().getSimpleName()+"，改用完整界面复查");}
         return false;
     }
-    private boolean reviewClick(String pkg,List<AdMatcher.Node> nodes,List<Integer> choices,Set<String> visible,int windowId,List<AccessibilityNodeInfo> refs,Point size) {
+    private boolean reviewClick(String pkg,List<AdMatcher.Node> nodes,List<Integer> choices,boolean targetVisible,int windowId,List<AccessibilityNodeInfo> refs,Point size) {
         long now=SystemClock.uptimeMillis();
         Pending action=pending;boolean eligible=false;AdMatcher.Node target=null;
         int targetIndex=-1;
         for(int i:choices)if(action.key.equals(fingerprint(pkg,nodes.get(i)))){eligible=true;target=nodes.get(i);targetIndex=i;break;}
         if(eligible&&action.nativeSplash&&targetIndex!=NativeSplashSkip.find(nodes,size.x,size.y,startupProbe.active(now),pkg))eligible=false;
         if(eligible&&action.nativePause&&targetIndex!=BiliPanel.nativePauseClose(nodes,size.x,size.y))eligible=false;
-        boolean sameApp=action.pkg.equals(pkg),sameWindow=action.windowId==windowId,targetVisible=visible.contains(action.key);
+        boolean sameApp=action.pkg.equals(pkg),sameWindow=action.windowId==windowId;
         ClickReview.Action decision=action.review.decide(now,sameApp&&sameWindow,targetVisible,eligible,prefs.getBoolean("gesture_retry",true));
         String currentTrace=traceBase;
         String detail="同应用="+sameApp+"，同窗口="+sameWindow+"，原按钮仍可见="+targetVisible
@@ -1022,7 +1022,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             while(visualSteps.size()>16)visualSteps.removeFirst();
         }
         StringBuilder steps=new StringBuilder();for(String step:visualSteps)steps.append('\n').append(step);
-        visualDiagnostic="JUMP 0.5.35 · "+(visualSplash?"开屏画面识别":"本地广告面板识别")+"\n应用："+visualPackage+"\n"+message+"\n最近画面过程："+steps;
+        visualDiagnostic="JUMP 0.5.36 · "+(visualSplash?"开屏画面识别":"本地广告面板识别")+"\n应用："+visualPackage+"\n"+message+"\n最近画面过程："+steps;
         // Snapshot encoding and persistence are batched by trace; action records stay immediate.
         traceInteresting=visualInteresting;trace(visualPackage,"画面识别："+message,false);
     }
@@ -1433,7 +1433,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
         if(frame.renderedPanel)renderProbes.markAttempt();
         if(frame.timedClose&&DelayedAdWatch.jm(pkg))timedClose.clear("已提交红X动作，下一帧只作结果观察");
         if(frame.wmHint!=null)wmTouchReview.mark(pkg,windowId,display,frame.wmHint,wordX,wordY,frame.timestamp,now);
-        if(!wmRetry) {actionPackage=pkg;actionDiagnostic="JUMP 0.5.35\n应用："+pkg+"，窗口="+windowId
+        if(!wmRetry) {actionPackage=pkg;actionDiagnostic="JUMP 0.5.36\n应用："+pkg+"，窗口="+windowId
             +"\n目标方式="+(splash?(frame.kind==SplashActions.PICA_NOTICE?"哔咔第"+splashActions.noticeCount()+"条公告，不再顯示":frame.kind==SplashActions.PICA_CLOSE?"哔咔开屏，左上角白色圆圈X已出现":frame.timedClose?"广告计时结束后关闭当前红X，不重复等待":frame.circularSkip?"本地匹配当前圆环与跳过两字":"本地匹配开屏‘跳过’字形"):frame.biliLaunch?"B站全屏开屏：两帧核验右下跳过和倒计时":"本地像素识别广告面板X，即时点击")+"\n实际目标中心=("+x+","+y+")";}
         if(wmRetry)actionStep(pkg,"WM_RETRY_CONFIRMED：已重新取得当前窗口="+windowId+"的SDK控件和两张连续新画面；剩余预算内补一次触摸，不复用旧窗口目标；位置=("+x+","+y+")");
         actionStep(actionPackage,"VISUAL_CONFIRMED："+(splash?"已复查开屏广告上下文；":frame.biliLaunch?"已复查当前开屏窗口及两帧右下跳过目标；":"当前帧广告面板特征匹配，无需等待前往观看；")+detail);

@@ -69,6 +69,9 @@ public final class BiliRobustTest {
         List<AdMatcher.Node> n=nodes(w,h);BiliPanel.Hint hint=BiliPanel.find(n,w,h);
         check(hint!=null,"current native ad ancestor identifies bottom sheet");
         check(BiliPanel.canProbe(n,w,h),"localized ad badge can wake current sheet before a CTA loads");
+        BiliPanel.Inspection first=BiliPanel.inspect(n,w,h,true), nativeOnly=BiliPanel.inspect(n,w,h,false);
+        check(BiliPanel.same(first.hint,hint)&&first.nativeEvidence&&!first.pixelLabelContext,"single discovery preserves prior scope and visual gating");
+        check(BiliPanel.same(nativeOnly.hint,hint)&&!nativeOnly.nativeEvidence&&!nativeOnly.pixelLabelContext,"visual setting off preserves native scope");
         check(BiliPanel.confirmTarget(n,w,h,hint,(int)(w*.94),(int)(h*.343)),"live sheet header covers the actual X");
         check(!BiliPanel.confirmTarget(n,w,h,hint,(int)(w*.94),(int)(h*.46)),"X lower than verified sheet header denied by final recheck");
         check(BiliVisual.detect(base,w,h,hint).found(),"native scope still needs actual pictured X");
@@ -91,6 +94,9 @@ public final class BiliRobustTest {
         check(BiliPanel.find(n,w,h)==null,"conflicting current ad panels stay ambiguous");
         n.add(box(3,w,h,.16,.88,.83,.94,"前往观看"));
         check(!BiliPanel.canProbe(n,w,h)&&!BiliPanel.confirmTarget(n,w,h,null,(int)(w*.94),(int)(h*.343)),"conflicting scopes never fall back to broad CTA evidence");
+        BiliPanel.Inspection conflicting=BiliPanel.inspect(n,w,h,true);
+        check(conflicting.hint==null&&!conflicting.nativeEvidence&&!conflicting.pixelLabelContext,
+            "combined discovery cannot reopen an ambiguous scope");
         n=nodes(w,h);n.add(box(1,w,h,.03,.331,.15,.359,"评论"));
         n.add(box(1,w,h,.16,.90,.82,.95,"前往观看"));
         check(BiliPanel.find(n,w,h)==null&&!BiliPanel.canProbe(n,w,h),"comment sheet with an ad recommendation cannot trigger a panel screenshot");

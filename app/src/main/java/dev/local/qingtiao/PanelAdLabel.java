@@ -2,7 +2,7 @@ package dev.local.qingtiao;
 
 /** Checks the small, light 广告 disclosure just above the recommendation card. */
 final class PanelAdLabel {
-    private static final int COLUMNS=14, ROWS=8;
+    private static final int COLUMNS=14, ROWS=8, LETTER_COLUMNS=COLUMNS/2, SAMPLE_COUNT=ROWS*LETTER_COLUMNS;
     // Luminance of the UI lettering alone, averaged to half scale.
     private static final int[] LABEL={
          5, 1, 7, 5, 4, 4, 4,  2, 4, 5, 5, 6, 6, 2,
@@ -24,6 +24,24 @@ final class PanelAdLabel {
         15,31, 6,10,10,10,10, 22,29,12,12,39,10,10,
          5, 8,12,10,10,10,10, 14, 8,13,12, 9, 9, 8
     };
+    private static final Template LIGHT=new Template(LABEL),DARK=new Template(DARK_LABEL);
+
+    private static final class Template {
+        final int[] samples;
+        final int[] sum=new int[2],variance=new int[2];
+        Template(int[] samples){
+            this.samples=samples;
+            for(int part=0;part<2;part++){
+                int first=part*LETTER_COLUMNS, squares=0;
+                for(int row=0;row<ROWS;row++)for(int col=first;col<first+LETTER_COLUMNS;col++){
+                    int value=samples[row*COLUMNS+col];
+                    sum[part]+=value;
+                    squares+=value*value;
+                }
+                variance[part]=squares*SAMPLE_COUNT-sum[part]*sum[part];
+            }
+        }
+    }
 
     static final class Position {
         final int x,y;
@@ -32,18 +50,21 @@ final class PanelAdLabel {
     static Position find(int[] pixels,int width,int height,int headerY){
         int radius=Math.max(2,Math.round(width*.004f));
         int top=headerY+Math.round(width*.58f),bottom=Math.min(height-radius,headerY+Math.round(width*.94f));
-        int maxGap=Math.round(width*.014f);
-        int[] glyph=new int[LABEL.length];
+        int maxGap=Math.round(width*.014f),backgroundX=Math.round(width*.108f);
+        int firstHeight=Math.round(width*.024f),lastHeight=Math.round(width*.031f);
+        int firstX=Math.round(width*.026f),lastX=Math.round(width*.038f);
+        int firstWidth=Math.round(width*.044f),lastWidth=Math.round(width*.052f);
         for(int edge=top;edge<bottom;edge++){
             int direction=cardEdge(pixels,width,edge,radius);
             if(direction==0||edge>top&&cardEdge(pixels,width,edge-1,radius)==direction)continue;
-            int[] reference=direction<0?LABEL:DARK_LABEL;
-            for(int heightPx=Math.round(width*.024f);heightPx<=Math.round(width*.031f);heightPx++){
+            Template reference=direction<0?LIGHT:DARK;
+            for(int heightPx=firstHeight;heightPx<=lastHeight;heightPx++){
                 for(int gap=-radius;gap<=maxGap;gap++){
                     int y=edge-gap-heightPx;
-                    for(int x=Math.round(width*.026f);x<=Math.round(width*.038f);x++){
-                        for(int widthPx=Math.round(width*.044f);widthPx<=Math.round(width*.052f);widthPx++){
-                            if(letters(pixels,width,x,y,widthPx,heightPx,glyph,reference))
+                    for(int x=firstX;x<=lastX;x++){
+                        for(int widthPx=firstWidth;widthPx<=lastWidth;widthPx++){
+                            if(matchesLetter(pixels,width,x,y,widthPx,heightPx,backgroundX,reference,0)
+                                &&matchesLetter(pixels,width,x,y,widthPx,heightPx,backgroundX,reference,1))
                                 return new Position(x+widthPx/2,y+heightPx/2);
                         }
                     }
@@ -65,38 +86,25 @@ final class PanelAdLabel {
         return direction;
     }
 
-    private static boolean letters(int[] p,int w,int x,int y,int tw,int th,int[] glyph,int[] reference){
+    private static boolean matchesLetter(int[] p,int w,int x,int y,int tw,int th,int backgroundX,Template template,int part){
+        int a=0,aa=0,ab=0,first=part*LETTER_COLUMNS;
         for(int row=0;row<ROWS;row++){
             int y0=y+row*th/ROWS,y1=y+(row+1)*th/ROWS;
-            int bg=light(p[(y0+y1-1)/2*w+Math.round(w*.108f)]);
-            for(int col=0;col<COLUMNS;col++){
+            int bg=light(p[(y0+y1-1)/2*w+backgroundX]);
+            int endY=Math.max(y0+1,y1);
+            for(int col=first;col<first+LETTER_COLUMNS;col++){
                 int x0=x+col*tw/COLUMNS,x1=x+(col+1)*tw/COLUMNS;
-                int sum=0,count=0;
-                for(int sy=y0;sy<Math.max(y0+1,y1);sy++)for(int sx=x0;sx<Math.max(x0+1,x1);sx++){
-                    sum+=light(p[sy*w+sx]);
-                    count++;
-                }
-                glyph[row*COLUMNS+col]=sum/count-bg;
-            }
-        }
-        return matchesLetter(glyph,reference,0)&&matchesLetter(glyph,reference,COLUMNS/2);
-    }
-
-    private static boolean matchesLetter(int[] glyph,int[] template,int start){
-        int a=0,b=0,aa=0,bb=0,ab=0,count=ROWS*COLUMNS/2;
-        for(int i=start;i<LABEL.length;i+=COLUMNS){
-            for(int j=i;j<i+COLUMNS/2;j++){
-                int sample=glyph[j],reference=template[j];
+                int endX=Math.max(x0+1,x1),sum=0;
+                for(int sy=y0;sy<endY;sy++)for(int sx=x0;sx<endX;sx++)sum+=light(p[sy*w+sx]);
+                int sample=sum/((endY-y0)*(endX-x0))-bg;
                 a+=sample;
-                b+=reference;
                 aa+=sample*sample;
-                bb+=reference*reference;
-                ab+=sample*reference;
+                ab+=sample*template.samples[row*COLUMNS+col];
             }
         }
-        int variance=aa*count-a*a,covariance=ab*count-a*b;
-        return a>=count*2&&variance>=count*count*12&&covariance>0
-            &&covariance>=.80*Math.sqrt((double)variance*(bb*count-b*b));
+        int variance=aa*SAMPLE_COUNT-a*a,covariance=ab*SAMPLE_COUNT-a*template.sum[part];
+        return a>=SAMPLE_COUNT*2&&variance>=SAMPLE_COUNT*SAMPLE_COUNT*12&&covariance>0
+            &&covariance>=.80*Math.sqrt((double)variance*template.variance[part]);
     }
 
     private static int light(int rgb){

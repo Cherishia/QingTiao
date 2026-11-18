@@ -17,7 +17,7 @@ public final class AdMatcher {
         public Node(int parent,int l,int t,int r,int b,String text,String id) {
             this.parent=parent;left=l;top=t;right=r;bottom=b;this.text=text;this.id=id;
         }
-        public boolean evidence() {return visible && (MatchPolicy.isAdEvidence(text,id)||MatchPolicy.isAdEvidence(desc,id));}
+        public boolean evidence() {return visible&&MatchPolicy.isAdEvidence(text,desc,id);}
     }
     private static final String[] SDK_CLOSE={"tt_video_ad_close_layout","tt_bu_close",
         "ksad_splash_close_btn","ksad_interstitial_close_btn","mbridge_interstitial_iv_close",
@@ -124,8 +124,10 @@ public final class AdMatcher {
     }
     public static boolean biliSheetClose(List<Node> nodes,int index,int w,int h) {
         if(index<=0||index>=nodes.size()||w<=0||h<w*1.2)return false;
+        return biliSheetClose(nodes,index,w,h,biliCloseControl(nodes.get(index)));
+    }
+    private static boolean biliSheetClose(List<Node> nodes,int index,int w,int h,boolean semantic){
         Node target=nodes.get(index);
-        boolean semantic=biliCloseControl(target);
         if(!semantic&&(target.left<w*.75||target.top<h*.16||target.bottom>h*.74))return false;
         if(!target.visible||!target.enabled||target.editable||target.checkable||(!semantic&&!iconButton(nodes,index,w,h,false))
             ||!small(target,w,h)||target.right-target.left>w*.20||target.bottom-target.top>h*.08)return false;
@@ -141,7 +143,7 @@ public final class AdMatcher {
                 for(int j=1;j<nodes.size();j++) {
                     Node n=nodes.get(j);
                     if(!n.visible||!inside(n,box)||n.top<target.bottom||!descendant(nodes,j,parent))continue;
-                    if(n.evidence())ad=true;
+                    if(n.evidence()){ad=true;break;}
                 }
                 // A scrollable recommendation list is allowed only in this bounded, explicitly marked ad sheet.
                 if(ad&&(semantic||pairedIconClose(nodes,index,parent,w,h)))return true;
@@ -157,9 +159,10 @@ public final class AdMatcher {
             Node n=nodes.get(i);if(!n.visible)continue;
             if(n.evidence()&&++ads<=3)appendBiliCue(cues,"广告标识",n);
             if(watchAction(n)&&++watch<=3)appendBiliCue(cues,"前往观看",n);
-            if(biliCloseControl(n))close++;
+            boolean semantic=biliCloseControl(n);
+            if(semantic)close++;
             if(n.left>=w*.75&&n.top>=h*.16&&n.bottom<=h*.74&&iconButton(nodes,i,w,h,false))icons++;
-            if(biliSheetClose(nodes,i,w,h))matched++;
+            if(w>0&&h>=w*1.2&&biliSheetClose(nodes,i,w,h,semantic))matched++;
         }
         return "B站广告面板：广告标识="+ads+"，前往观看="+watch+"，关闭语义="+close+"，右侧无文字图标="+icons+"，符合面板条件="+matched+cues;
     }
