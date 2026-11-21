@@ -2,7 +2,7 @@
 
 轻跳是一款 Android 广告跳过工具。它通过无障碍服务识别开屏广告、浏览弹窗和视频广告面板，并在确认当前窗口和目标后点击跳过或关闭。
 
-[下载最新版](https://github.com/Cherishia/QingTiao/releases/latest) · [更新记录](https://github.com/Cherishia/QingTiao/releases) · [反馈问题](https://github.com/Cherishia/QingTiao/issues)
+[下载最新版](https://github.com/Cherishia/QingTiao/releases/latest) · [更新记录](https://github.com/Cherishia/QingTiao/releases) · [反馈问题](https://github.com/Cherishia/QingTiao/issues/new/choose)
 
 ## 安装与更新
 
@@ -39,11 +39,11 @@ python build.py --java-home 'C:/path/to/jdk-17' --build-tools 'C:/path/to/Androi
 
 脚本会先运行回归测试，再编译并签名。可以用 `--build-dir` 指定构建目录。首次本地构建会生成测试签名。覆盖安装 GitHub 正式版时，请使用发布页提供的同签名 APK。
 
-维护者发布更新时，应递增 `versionCode`，使用与 `versionName` 一致的 Git 标签，并将原证书签名的 `QingTiao-版本号.apk` 上传到正式 Release。历史测试细节见[验证记录](VALIDATION.md)。
+历史测试细节见[验证记录](VALIDATION.md)。
 
 ## 反馈与贡献
 
-欢迎提交 [Issue](https://github.com/Cherishia/QingTiao/issues) 或 [Pull Request](https://github.com/Cherishia/QingTiao/pulls)。反馈漏跳或误点时，请附上轻跳版本、Android 版本、出现问题的应用和复现步骤。有识别记录时，可以附上相关片段，提交前请去掉个人信息。
+欢迎通过[问题反馈表](https://github.com/Cherishia/QingTiao/issues/new?template=bug_report.yml)报告问题，也可以提交 [Pull Request](https://github.com/Cherishia/QingTiao/pulls)。提交改动、测试和发布的步骤见[贡献指南](CONTRIBUTING.md)。
 
 ## 许可与素材
 
