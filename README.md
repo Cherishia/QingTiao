@@ -47,4 +47,6 @@ python build.py --java-home 'C:/path/to/jdk-17' --build-tools 'C:/path/to/Androi
 
 ## 许可与素材
 
-本仓库公开源码与安装包，目前尚未发布开源许可证。桌面图标的制作资料见[图标说明](artwork/README.md)。
+轻跳的源代码、构建脚本和测试采用 [MIT 许可证](LICENSE)。再发布代码时，请保留版权声明和许可证文本。
+
+桌面图标和参考插图的授权另行处理，见[图标说明](artwork/README.md)。
