@@ -57,6 +57,25 @@ public final class BiliVisualTest {
         mixedTree.remove(mixedTree.size()-1);renderer.visible=false;
         check(RenderedAdPanel.visibleControls(mixedTree,w,h)==0,"no visible renderer means no generic discovery");
         renderer.visible=true;
+        List<AdMatcher.Node> unlabelled=new java.util.ArrayList<>();
+        AdMatcher.Node viewport=new AdMatcher.Node(-1,0,0,w,h,"","");
+        viewport.className="android.widget.FrameLayout";
+        unlabelled.add(viewport);
+        for(int i=0;i<37;i++)unlabelled.add(new AdMatcher.Node(0,20,620,160,680,"",""));
+        for(int i=0;i<4;i++){
+            AdMatcher.Node hidden=new AdMatcher.Node(0,20,620,160,680,"","");hidden.visible=false;unlabelled.add(hidden);
+        }
+        check(RenderedAdPanel.visibleControls(unlabelled,w,h)==0,"renderer-free discovery requires an explicitly verified window");
+        check(RenderedAdPanel.visibleControls(unlabelled,w,h,true)==37,"reported 42-node window can use a bounded discovery opportunity after startup");
+        check(BiliPanel.drawnTargetProblem(unlabelled,w,h,540,439,49,890).isEmpty(),"current blank viewport can verify window context after the full two-frame pixel match");
+        unlabelled.get(1).editable=true;
+        check(RenderedAdPanel.visibleControls(unlabelled,w,h,true)==0,"blank input context is ineligible");
+        unlabelled.get(1).editable=false;
+        viewport.desc="评论";
+        check(RenderedAdPanel.visibleControls(unlabelled,w,h,true)==0
+            &&!BiliPanel.drawnTargetProblem(unlabelled,w,h,540,439,49,890).isEmpty(),"ordinary labelled content cancels the no-renderer fallback");
+        viewport.desc="";viewport.bottom=h/4;
+        check(RenderedAdPanel.visibleControls(unlabelled,w,h,true)==0,"small overlay is not a usable viewport");
         VisualReview review=new VisualReview();
         VisualFollowup followup=new VisualFollowup();
         check(!followup.pending()&&!followup.active(1000),"no review before system completes a touch");

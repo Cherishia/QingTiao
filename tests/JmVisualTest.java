@@ -12,7 +12,30 @@ public final class JmVisualTest {
     private static BiliVisual.Result detect(BufferedImage image) {
         int w=image.getWidth(),h=image.getHeight();return JmVisual.detect(image.getRGB(0,0,w,h,null,0,w),w,h);
     }
+    private static void replayCaptionDeadline(){
+        TimedClose clock=new TimedClose();
+        int window=33131;
+        long start=10000; // 23:05:14.354 in the report, measured relative to an arbitrary uptime.
+        check(clock.captionProbeAt(start)==-1,"route selection alone schedules no frame");
+        clock.caption(window,true,start);
+        long checkpoint=clock.captionProbeAt(start);
+        check(checkpoint==start+1800&&!clock.captionDue(window,checkpoint),"first checkpoint only refreshes caption evidence");
+        clock.caption(window,true,checkpoint);
+        long deadline=clock.captionProbeAt(checkpoint);
+        check(deadline==start+3100,"native caption schedules first screenshot at the original deadline");
+        check(!clock.captionDue(window,deadline-1)&&clock.captionDue(window,deadline),"a native read can bypass coalescing at the deadline");
+        check(!clock.captionDue(window+1,deadline)&&!clock.readyFrame(deadline),"old window and text alone cannot authorize a gesture");
+        check(start+4213-deadline==1113,"report's X confirmation was 1113ms after the scheduled target");
+        clock.caption(window,true,deadline);
+        check(clock.remaining(window,1085,337,12,deadline)==0&&clock.readyFrame(deadline),"on-time X is actionable if the fresh geometry matches");
+        check(!clock.readyFrame(deadline-1),"a frame captured early cannot be used after slow processing");
+        clock.clear();clock.caption(window,true,start);
+        check(clock.captionProbeAt(deadline)==-1,"unrefreshed caption expires before it can open the deadline path");
+        clock.caption(window+1,false,start+1000);
+        check(clock.captionProbeAt(start+1000)==-1,"window replacement clears pending caption work");
+    }
     public static void main(String[] args)throws Exception {
+        replayCaptionDeadline();
         java.util.List<AdMatcher.Node> sparse=new ArrayList<>();sparse.add(new AdMatcher.Node(-1,0,0,1080,2400,"",""));
         check(JmVisual.context("custom.webview",true,sparse),"sparse startup may be inspected without readable ad text");
         check(!JmVisual.context("custom.webview",false,sparse),"outside startup denied");

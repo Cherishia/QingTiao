@@ -193,7 +193,7 @@ public final class BiliPanel {
         if(!eligible(nodes,w,h))return "控件树过大、包含敏感控件或方向不适用";
         Scope current=scope(nodes,w,h);
         if(current.competing)return "多个原生广告面板范围重叠";
-        boolean context=!current.blocked&&(pixelLabelContext(nodes,current)||RenderedAdPanel.visibleControls(nodes,w,h)>0);
+        boolean context=!current.blocked&&(pixelLabelContext(nodes,current)||RenderedAdPanel.visibleControls(nodes,w,h,true)>0);
         return RenderedAdPanel.targetProblem(nodes,w,h,x,y,labelX,labelY,context);
     }
 

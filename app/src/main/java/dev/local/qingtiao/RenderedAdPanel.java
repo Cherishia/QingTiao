@@ -5,18 +5,30 @@ import java.util.List;
 /** A rendered bottom ad sheet can be recognized without a particular app or resource ID. */
 final class RenderedAdPanel {
     static int visibleControls(List<AdMatcher.Node> nodes,int w,int h){
+        return visibleControls(nodes,w,h,false);
+    }
+    static int visibleControls(List<AdMatcher.Node> nodes,int w,int h,boolean allowUnlabelledWindow){
         if(nodes==null||nodes.size()>=1000||w<=0||h<w*1.4||h>w*3.0)return 0;
         int visible=0,unlabelled=0;
-        boolean hasRenderer=false;
+        boolean hasRenderer=false,hasViewport=false,hasInput=false,hasLabel=false;
         for(AdMatcher.Node n:nodes){
             if(!n.visible)continue;
             if(n.enabled&&!n.editable&&renderer(n.className))hasRenderer=true;
+            if(allowUnlabelledWindow){
+                hasInput|=n.editable||n.password||n.checkable;
+                hasViewport|=n.enabled&&n.className!=null&&!n.className.isEmpty()
+                    &&n.right-n.left>=w*.88&&n.bottom-n.top>=h*.48;
+            }
+            if(n.parent<0&&!allowUnlabelledWindow)continue;
+            boolean blank=MatchPolicy.normalize(n.text).isEmpty()&&MatchPolicy.normalize(n.desc).isEmpty();
+            hasLabel|=!blank;
             if(n.parent<0)continue;
             visible++;
-            if(MatchPolicy.normalize(n.text).isEmpty()&&MatchPolicy.normalize(n.desc).isEmpty())unlabelled++;
+            if(blank)unlabelled++;
         }
         boolean sparse=visible>0&&unlabelled==visible||visible>=12&&unlabelled*5>=visible*3;
-        return hasRenderer&&sparse&&!AdMatcher.sensitive(nodes)?visible:0;
+        boolean blankWindow=allowUnlabelledWindow&&hasViewport&&!hasInput&&!hasLabel&&visible>=8&&visible<=80;
+        return (hasRenderer&&sparse||blankWindow)&&!AdMatcher.sensitive(nodes)?visible:0;
     }
 
     static boolean renderer(String type){

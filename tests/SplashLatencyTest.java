@@ -33,6 +33,52 @@ public final class SplashLatencyTest {
         n.set(3,new AdMatcher.Node(2,0,0,1200,2670,"",owner+":id/iv_advertisement_image"));
         n.get(3).className="android.widget.ImageView";return n;
     }
+    private static ArrayList<AdMatcher.Node> timerSplash(String owner,String role){
+        ArrayList<AdMatcher.Node> n=paintedSplash(owner,role,"跳过(1s)");
+        AdMatcher.Node timer=new AdMatcher.Node(2,999,134,1146,186,"跳过(1s)",owner+":id/"+role);
+        timer.className="android.widget.TextView";
+        n.set(4,timer);
+        return n;
+    }
+    private static void testNonClickableAdTimer(){
+        String pkg="com.pwrd.steam.esports",role="tv_advertisement_timer";
+        ArrayList<AdMatcher.Node> report=timerSplash(pkg,role);
+        NativeSplashSkip.Target match=NativeSplashSkip.inspect(report,1200,2670,true,pkg);
+        check(match.index==4&&match.timerImage==3&&!report.get(4).clickable,"reported non-clickable countdown has its own visual ad image witness");
+        check(AdMatcher.candidates(report,1200,2670,true,true,true,pkg).equals(java.util.Collections.singletonList(4)),"real sample geometry selects only the text target");
+        ArrayList<AdMatcher.Node> generic=timerSplash("example.reading","text_startup_ad_timer");
+        generic.get(4).text="Skip 2s";
+        check(NativeSplashSkip.find(generic,1200,2670,true,"example.reading")==4,"rule is not tied to the reported package or language");
+        AdMatcher.Node timer=report.get(4),image=report.get(3);
+        AdMatcher.Node current=timerSplash(pkg,role).get(4);
+        current.text="跳过(0s)";
+        check(NativeSplashSkip.currentControl(timer,current,1200,2670,pkg),"refresh permits a tick on the same timer");
+        current.text="跳过";
+        check(!NativeSplashSkip.currentControl(timer,current,1200,2670,pkg),"refresh requires the countdown wording to remain");
+        check(NativeSplashSkip.currentTimerImage(image,image,timer,1200,2670,pkg),"refresh retains whole ad image and timer footprint");
+        AdMatcher.Node smaller=timerSplash(pkg,role).get(3);smaller.right=1110;
+        check(!NativeSplashSkip.currentTimerImage(image,smaller,timer,1200,2670,pkg),"moved image cannot leave the gesture outside its ad area");
+        check(NativeSplashSkip.find(report,1200,2670,false,pkg)<0,"timer can only be used during startup");
+        for(int bad=0;bad<15;bad++){
+            ArrayList<AdMatcher.Node> n=timerSplash(pkg,role);AdMatcher.Node t=n.get(4),ad=n.get(3);
+            if(bad==0)ad.visible=false;
+            if(bad==1)ad.id=pkg+":id/iv_photo";
+            if(bad==2)ad.id="foreign:id/iv_advertisement_image";
+            if(bad==3)ad.parent=1;
+            if(bad==4)t.id=pkg+":id/tv_timer";
+            if(bad==5)t.id="foreign:id/"+role;
+            if(bad==6)t.text="跳过";
+            if(bad==7)t.desc="观看广告";
+            if(bad==8)t.enabled=false;
+            if(bad==9)t.top=500;
+            if(bad==10)t.editable=true;
+            if(bad==11)n.get(2).password=true;
+            if(bad==12)n.add(new AdMatcher.Node(2,999,228,1146,280,"跳过(2s)",t.id));
+            if(bad==13)ad.parent=4;
+            if(bad==14)t.parent=3;
+            check(NativeSplashSkip.find(n,1200,2670,true,pkg)<0,"advertisement timer rejects weakened evidence: "+bad);
+        }
+    }
     private static void testReusableNativeFamilies(){
         for(String pkg:new String[]{"example.reading", "example.weather"}){
             for(String id:new String[]{"splash_ad_layout","ad_splash_root","opening_ad_container","startup_ad_view"}) {
@@ -98,6 +144,7 @@ public final class SplashLatencyTest {
     private static BiliVisual.Result detect(BufferedImage im){return BiliLaunchVisual.detect(im.getRGB(0,0,720,1602,null,0,720),720,1602);}
     public static void main(String[] args)throws Exception{
         testReusableNativeFamilies();
+        testNonClickableAdTimer();
         ArrayList<AdMatcher.Node> report=fixture("tv.danmaku.bili","跳过 0");
         check(find(report)==5,"reported exact native count_down with three full-screen roles");
         check(AdMatcher.candidates(report,1200,2670,true,true,true,"tv.danmaku.bili").contains(5),"native button is actionable without inaccessible ad text or image probe");

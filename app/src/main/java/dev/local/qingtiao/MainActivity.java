@@ -3,6 +3,7 @@ package dev.local.qingtiao;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -16,6 +17,7 @@ import android.net.Uri;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Icon;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
@@ -25,6 +27,7 @@ import android.provider.Settings;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Gravity;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.ArrayAdapter;
 import android.widget.CheckedTextView;
@@ -50,6 +53,9 @@ public final class MainActivity extends Activity {
     private static final int PAGE=0xfff5f3fa, LILAC=0xffeeebfa, WHITE=0xffffffff, RULE=0xffeeebf4, GREEN=0xff12654c;
     private static final int RECOVERY_NOTIFICATION_REQUEST=31;
     private LinearLayout content;
+    private Dialog activePanel;
+    private AppUpdate updates;
+    private TextView updateLink;
     private SharedPreferences prefs;
     private TextView status,statusHint,todayActions,totalActions,redirectActions,excludedSummary,recentActions;
     private LinearLayout excludedRows;
@@ -60,17 +66,27 @@ public final class MainActivity extends Activity {
         if(LocalLog.ACTIONS.equals(key))updateActivity();
         if(LocalLog.EXCLUDED.equals(key))updateExclusions();
     };
-    @Override public void onCreate(Bundle state) {super.onCreate(state);prefs=getSharedPreferences(LocalLog.PREFS,0);}
+    @Override public void onCreate(Bundle state) {
+        super.onCreate(state);
+        prefs=getSharedPreferences(LocalLog.PREFS,0);
+        updates=AppUpdate.get(this);
+    }
     @Override protected void onResume() {
         super.onResume();
         render();
         prefs.registerOnSharedPreferenceChangeListener(homeUpdates);
         ServiceRecovery.sync(this);
         ServiceRecovery.check(this);
+        updates.attach(this);
     }
     @Override protected void onPause() {
+        updates.detach(this);
         prefs.unregisterOnSharedPreferenceChangeListener(homeUpdates);
         super.onPause();
+    }
+    @Override protected void onDestroy() {
+        if(activePanel!=null)activePanel.dismiss();
+        super.onDestroy();
     }
     private int dp(float value) {return (int)(value*getResources().getDisplayMetrics().density+.5f);}
     private TextView text(String value,int size,int color,boolean bold) {
@@ -90,7 +106,7 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams layout=new LinearLayout.LayoutParams(-1,-2);layout.topMargin=dp(4);layout.bottomMargin=dp(4);
         parent.addView(b,layout);b.setOnClickListener(v->action.run());return b;
     }
-    private void actionRow(LinearLayout parent,String left,Runnable leftAction,String right,Runnable rightAction,boolean primary) {
+    private Button actionRow(LinearLayout parent,String left,Runnable leftAction,String right,Runnable rightAction,boolean primary) {
         LinearLayout row=new LinearLayout(this);parent.addView(row);
         Button a=button(row,left,leftAction),b=button(row,right,rightAction);
         if(primary){
@@ -100,6 +116,34 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams al=new LinearLayout.LayoutParams(0,-2,1),bl=new LinearLayout.LayoutParams(0,-2,1);
         al.rightMargin=dp(5);bl.leftMargin=dp(5);al.topMargin=bl.topMargin=dp(4);al.bottomMargin=bl.bottomMargin=dp(4);
         a.setLayoutParams(al);b.setLayoutParams(bl);
+        return a;
+    }
+    private Dialog panel(String title,String subtitle,View body,LinearLayout footer) {
+        Dialog dialog=new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18),dp(14),dp(18),dp(10));card.setBackground(background(WHITE));
+        card.addView(text(title,19,INK,true));
+        if(!subtitle.isEmpty()){gap(card,3);card.addView(text(subtitle,13,MUTED,false));}
+        gap(card,12);
+        card.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+        gap(card,5);card.addView(footer);
+        Window window=dialog.getWindow();
+        if(window!=null)window.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        dialog.setContentView(card);dialog.show();
+        activePanel=dialog;
+        dialog.setOnDismissListener(ignored->forgetPanel(dialog));
+        if(window!=null){
+            android.util.DisplayMetrics screen=getResources().getDisplayMetrics();
+            window.setLayout(Math.min(screen.widthPixels-dp(28),dp(540)),(int)(screen.heightPixels*.83));
+        }
+        return dialog;
+    }
+    private void forgetPanel(Dialog dialog) {
+        if(activePanel==dialog)activePanel=null;
+    }
+    private LinearLayout column() {
+        LinearLayout result=new LinearLayout(this);result.setOrientation(LinearLayout.VERTICAL);return result;
     }
     private boolean enabledInSystem() {
         return ServiceRecovery.systemEnabled(this);
@@ -164,7 +208,10 @@ public final class MainActivity extends Activity {
         LinearLayout history=card();LinearLayout historyHeading=heading(history,"最近记录");
         link(historyHeading,"抓取记录",this::advertReport);
         recentActions=text("",13,MUTED,false);gap(history,5);history.addView(recentActions);
-        TextView footer=text("轻跳 0.5.36",12,MUTED,false);footer.setGravity(Gravity.CENTER);content.addView(footer);
+        LinearLayout footer=new LinearLayout(this);footer.setGravity(Gravity.CENTER);
+        footer.addView(text("轻跳 "+updates.version(),12,MUTED,false));
+        updateLink=link(footer,"检查更新",updates::check);updateLink.setTextSize(12);
+        content.addView(footer);
         updateStatus();updateActivity();updateExclusions();
     }
     private void setRecoveryReminder(boolean enabled){
@@ -185,10 +232,14 @@ public final class MainActivity extends Activity {
         LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);parent.addView(row);
         row.addView(text(label,18,INK,true),new LinearLayout.LayoutParams(0,-2,1));return row;
     }
-    private void link(LinearLayout parent,String label,Runnable action){
+    private TextView link(LinearLayout parent,String label,Runnable action){
         TextView view=text(label,14,ACCENT,true);view.setGravity(Gravity.CENTER);view.setMinHeight(dp(48));
         view.setPadding(dp(9),0,dp(9),0);view.setBackground(new RippleDrawable(ColorStateList.valueOf(0x225245ad),null,background(WHITE)));
         parent.addView(view,new LinearLayout.LayoutParams(-2,-2));view.setOnClickListener(v->action.run());
+        return view;
+    }
+    void showUpdateState(String label,boolean enabled){
+        if(updateLink!=null){updateLink.setText(label);updateLink.setEnabled(enabled);updateLink.setTextColor(enabled?ACCENT:MUTED);}
     }
     private void divider(LinearLayout parent){
         View line=new View(this);line.setBackgroundColor(RULE);parent.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
@@ -229,35 +280,69 @@ public final class MainActivity extends Activity {
     private Map<String,String> sortApps(List<String> packages){
         Map<String,String> labels=new HashMap<>();
         for(String pkg:packages)labels.put(pkg,appLabel(pkg));
+        sortApps(packages,labels);
+        return labels;
+    }
+    private void sortApps(List<String> packages,Map<String,String> labels){
         Collator order=Collator.getInstance(Locale.SIMPLIFIED_CHINESE);
         packages.sort((a,b)->{int compare=order.compare(labels.get(a),labels.get(b));return compare!=0?compare:a.compareTo(b);});
-        return labels;
     }
     private Drawable appIcon(String pkg){
         try{return getPackageManager().getApplicationIcon(pkg);}
         catch(android.content.pm.PackageManager.NameNotFoundException unavailable){return getPackageManager().getDefaultActivityIcon();}
     }
     private void chooseExcludedApps(){
-        Set<String> chosen=new HashSet<>(excludedApps()),all=new HashSet<>(chosen);
-        Intent launcher=new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        for(ResolveInfo app:getPackageManager().queryIntentActivities(launcher,0))
-            if(app.activityInfo!=null&&!app.activityInfo.packageName.equals(getPackageName()))all.add(app.activityInfo.packageName);
-        List<String> packages=new ArrayList<>(all);
-        Map<String,String> labels=sortApps(packages);
+        Set<String> initial=new HashSet<>(excludedApps()),chosen=new HashSet<>(initial);
+        ListView list=new ListView(this);list.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+        LinearLayout body=column(),footer=column();
+        TextView loading=text("正在读取已安装应用…",14,MUTED,false);
+        body.addView(loading);body.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        Dialog picker=panel("不处理的应用","选中的应用会暂停轻跳识别",body,footer);
+        Button save=actionRow(footer,"保存",()-> {
+            prefs.edit().putStringSet(LocalLog.EXCLUDED,new HashSet<>(chosen)).apply();
+            picker.dismiss();
+        },"取消",picker::dismiss,true);
+        save.setEnabled(false);
+        Thread loader=new Thread(()-> {
+            try {
+                Intent launcher=new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+                Set<String> all=new HashSet<>(initial);
+                for(ResolveInfo app:getPackageManager().queryIntentActivities(launcher,0))
+                    if(app.activityInfo!=null&&!app.activityInfo.packageName.equals(getPackageName()))
+                        all.add(app.activityInfo.packageName);
+                if(Thread.currentThread().isInterrupted())return;
+                List<String> packages=new ArrayList<>(all);
+                Map<String,String> labels=sortApps(packages);
+                runOnUiThread(()-> {
+                    if(!picker.isShowing()||isDestroyed())return;
+                    if(packages.isEmpty()){loading.setText("没有可添加的应用");return;}
+                    loading.setVisibility(View.GONE);
+                    fillExcludedApps(list,chosen,packages,labels);
+                    save.setEnabled(true);
+                });
+            } catch(RuntimeException unavailable){
+                runOnUiThread(()-> {if(picker.isShowing()&&!isDestroyed())loading.setText("读取应用列表失败，请重新打开");});
+            }
+        },"QingTiao-app-picker");
+        picker.setOnDismissListener(dialog->{loader.interrupt();forgetPanel(picker);});
+        loader.start();
+    }
+    private void fillExcludedApps(ListView list,Set<String> chosen,List<String> packages,Map<String,String> labels){
+        Map<String,Drawable> icons=new HashMap<>();
         ArrayAdapter<String> adapter=new ArrayAdapter<String>(this,android.R.layout.simple_list_item_multiple_choice,packages){
             @Override public View getView(int position,View recycled,ViewGroup parent){
                 CheckedTextView row=(CheckedTextView)super.getView(position,recycled,parent);
                 String pkg=getItem(position);
                 row.setText(labels.get(pkg));
-                Drawable icon=appIcon(pkg);icon.setBounds(0,0,dp(32),dp(32));
+                row.setTextColor(INK);
+                row.setCheckMarkTintList(ColorStateList.valueOf(ACCENT));
+                Drawable icon=icons.computeIfAbsent(pkg,MainActivity.this::appIcon);icon.setBounds(0,0,dp(32),dp(32));
                 row.setCompoundDrawablesRelative(icon,null,null,null);
                 row.setCompoundDrawablePadding(dp(12));
                 return row;
             }
         };
-        AlertDialog picker=new AlertDialog.Builder(this).setTitle("选择不处理的应用").setAdapter(adapter,null)
-            .setPositiveButton("保存",(d,w)->prefs.edit().putStringSet(LocalLog.EXCLUDED,chosen).apply()).setNegativeButton("取消",null).show();
-        ListView list=picker.getListView();list.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+        list.setAdapter(adapter);
         for(int i=0;i<packages.size();i++)if(chosen.contains(packages.get(i)))list.setItemChecked(i,true);
         list.setOnItemClickListener((parent,row,index,id)->{
             String pkg=packages.get(index);
@@ -388,9 +473,16 @@ public final class MainActivity extends Activity {
     }
     private void showPage(String page) {
         String report=pageReport(page);
-        new AlertDialog.Builder(this).setTitle("界面识别记录 · 含未识别")
-            .setMessage(report).setPositiveButton("关闭",null).setNeutralButton("复制",(d,w)->copy(report))
-            .setNegativeButton("选择最近应用",(d,w)->selectReading()).show();
+        LinearLayout body=column(),footer=column();
+        ScrollView scroll=new ScrollView(this);scroll.setBackground(background(PAGE));
+        TextView details=text(report,13,INK,false);details.setPadding(dp(13),dp(10),dp(13),dp(12));
+        scroll.addView(details);body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        Dialog dialog=panel("界面识别记录","包含未识别的采样",body,footer);
+        LinearLayout tools=new LinearLayout(this);
+        tools.setGravity(Gravity.END);
+        body.addView(tools,0);
+        link(tools,"最近应用",()->{dialog.dismiss();selectReading();});
+        actionRow(footer,"复制",()->copy(report),"关闭",dialog::dismiss,true);
     }
     private void selectReading() {
         java.util.List<ReadingHistory.Entry> pages=recentReadings().entries();
@@ -399,13 +491,24 @@ public final class MainActivity extends Activity {
             ReadingHistory.Entry e=pages.get(i);int end=e.report.indexOf('\n');
             labels[i+1]=appLabel(e.pkg)+"\n"+(end<0?"":e.report.substring(0,end));
         }
-        new AlertDialog.Builder(this).setTitle("最近8个应用 · 未识别也保留").setItems(labels,(d,index)-> {
+        ListView list=new ListView(this);
+        list.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_list_item_1,labels){
+            @Override public View getView(int position,View recycled,ViewGroup parent){
+                TextView row=(TextView)super.getView(position,recycled,parent);
+                row.setTextColor(INK);row.setTextSize(15);return row;
+            }
+        });
+        LinearLayout footer=column();
+        Dialog dialog=panel("最近应用","最多保留 8 个应用的记录",list,footer);
+        list.setOnItemClickListener((parent,row,index,id)-> {
+            dialog.dismiss();
             if(index==0)showPage(SkipService.connected?SkipService.adDiagnostic:prefs.getString("ad_trace",SkipService.adDiagnostic));
             else showPage(pages.get(index-1).report);
-        }).setPositiveButton("关闭",null).setNeutralButton("复制全部",(d,w)-> {
+        });
+        actionRow(footer,"复制全部",()-> {
             StringBuilder all=new StringBuilder();for(ReadingHistory.Entry e:pages)all.append(pageReport(e.report)).append("\n\n");
             copy(all.length()==0?"尚无最近应用记录\n"+SkipService.watchDiagnostic:all.toString());
-        }).show();
+        },"关闭",dialog::dismiss,true);
     }
     private void appDetails() {
         try {startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));}

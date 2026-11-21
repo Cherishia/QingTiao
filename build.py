@@ -16,7 +16,7 @@ def main():
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
     parser.add_argument('--build-tools', required=True)
     parser.add_argument('--android-jar', required=True)
-    parser.add_argument('--out', default=str(ROOT.parent/'QingTiao-0.5.36.apk'))
+    parser.add_argument('--out', default=str(ROOT.parent/'QingTiao-0.5.40.apk'))
     parser.add_argument('--build-dir', default=str(ROOT/'build'))
     args=parser.parse_args()
     if not args.java_home: parser.error('--java-home or JAVA_HOME is required')
@@ -83,6 +83,8 @@ def main():
     run(java,'-cp',test,'dev.local.qingtiao.RecoveryStateTest')
     run(javac,'-encoding','UTF-8','-cp',test,'-d',test,policy/'ModeReminder.java',ROOT/'tests/ModeReminderTest.java')
     run(java,'-cp',test,'dev.local.qingtiao.ModeReminderTest')
+    run(javac,'-encoding','UTF-8','-cp',test,'-d',test,policy/'UpdateReleasePolicy.java',ROOT/'tests/UpdateReleasePolicyTest.java')
+    run(java,'-cp',test,'dev.local.qingtiao.UpdateReleasePolicyTest')
     run(aapt,'compile','--dir',source/'res','-o',build/'resources.zip')
     run(aapt,'link','-o',build/'resources.apk','-I',android,'--manifest',source/'AndroidManifest.xml',
         '--java',gen,'-A',source/'assets','--auto-add-overlay',build/'resources.zip')

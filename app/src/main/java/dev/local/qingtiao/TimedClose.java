@@ -2,7 +2,8 @@ package dev.local.qingtiao;
 
 /** Brief missed frames preserve elapsed time; a fresh positive observation is still required to act. */
 public final class TimedClose {
-    static final long WAIT_MS=3100,CONTINUITY_MS=2500;
+    static final long WAIT_MS=3100,CONTINUITY_MS=2500,LATE_X_WINDOW_MS=1650;
+    private static final long CHECKPOINT_MS=1800;
     private int window=-1,x,y;
     private long firstSeen=-1,lastSeen=-1;
     private int hits,misses;
@@ -21,6 +22,14 @@ public final class TimedClose {
         }
     }
     private void clearCaption(){captionWindow=-1;captionStarted=-1;captionLast=-1;}
+    /** The caption alone schedules a text check or a deadline read, never a click. */
+    long captionProbeAt(long now){
+        if(active()||captionStarted<0||now<captionLast||now-captionLast>CONTINUITY_MS)return -1;
+        return Math.min(captionStarted+WAIT_MS,captionLast+CHECKPOINT_MS);
+    }
+    boolean captionDue(int currentWindow,long now){
+        return captionProbeAt(now)>=0&&currentWindow==captionWindow&&now>=captionStarted+WAIT_MS;
+    }
     public long remaining(int currentWindow,int cx,int cy,int tolerance,long now) {
         if(firstSeen<0||currentWindow!=window||Math.abs(cx-x)>tolerance||Math.abs(cy-y)>tolerance||now<lastSeen||now-lastSeen>CONTINUITY_MS) {
             boolean borrowCaption=firstSeen<0&&captionStarted>=0&&captionWindow==currentWindow&&now>=captionLast&&now-captionLast<=CONTINUITY_MS;
@@ -36,7 +45,7 @@ public final class TimedClose {
     long nextProbeAt(long now){
         if(!active()||now<lastSeen)return now;
         long due=firstSeen+WAIT_MS;
-        return Math.max(now,due-lastSeen>2200?lastSeen+1800:due);
+        return Math.max(now,due-lastSeen>2200?lastSeen+CHECKPOINT_MS:due);
     }
     boolean readyFrame(long frameTime){return active()&&frameTime>=firstSeen+WAIT_MS;}
     public boolean missing(int currentWindow,long now) {
