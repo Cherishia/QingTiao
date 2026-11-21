@@ -86,8 +86,10 @@ def main():
     run(javac,'-encoding','UTF-8','-cp',test,'-d',test,policy/'UpdateReleasePolicy.java',ROOT/'tests/UpdateReleasePolicyTest.java')
     run(java,'-cp',test,'dev.local.qingtiao.UpdateReleasePolicyTest')
     run(aapt,'compile','--dir',source/'res','-o',build/'resources.zip')
+    assets=source/'assets'
+    asset_args=['-A',assets] if assets.is_dir() else []
     run(aapt,'link','-o',build/'resources.apk','-I',android,'--manifest',source/'AndroidManifest.xml',
-        '--java',gen,'-A',source/'assets','--auto-add-overlay',build/'resources.zip')
+        '--java',gen,*asset_args,'--auto-add-overlay',build/'resources.zip')
     sources=list((source/'java').rglob('*.java'))+list(gen.rglob('*.java'))
     # A response file keeps command length below the Windows limit.
     response=build/'javac.args'
