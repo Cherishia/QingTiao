@@ -13,7 +13,7 @@ final class VisualFrame {
         long timestamp,analysisMs;
         BiliVisual.Result result;
         String error;
-        boolean reusedNegative,canvasSkip,canvasNativeAd,timedClose,picaScene,picaWaiting,requireCaption,circularSkip,volunteer,oopzSurface,oopzHeader,oopzBottom,oopzCarrier,wmPair,biliLaunch,renderedPanel;
+        boolean reusedNegative,canvasSkip,canvasNativeAd,miniProgramSkip,timedClose,picaScene,picaWaiting,requireCaption,circularSkip,volunteer,oopzSurface,oopzHeader,oopzBottom,oopzCarrier,wmPair,biliLaunch,renderedPanel;
         long noticeSignature;
         WmSplashVisual.Hint wmHint;
         BiliPanel.Hint biliHint;
@@ -21,10 +21,10 @@ final class VisualFrame {
         int kind;
     }
     static Data analyzeRenderedPanel(AccessibilityService.ScreenshotResult screenshot,NegativeFrameCache negatives){
-        return analyze(screenshot,false,"",false,null,false,false,null,false,false,false,
+        return analyze(screenshot,false,"",false,null,false,false,null,false,false,false,false,
             negatives,null,null,false,true,true);
     }
-    static Data analyze(AccessibilityService.ScreenshotResult screenshot,boolean splash,String pkg,boolean jmCaption,WmSplashVisual.Hint wmHint,boolean volunteer,boolean oopzSurface,OopzLeftSkipVisual.Hint oopzLeftHint,boolean carrier,boolean canvasEligible,boolean canvasNativeAd,NegativeFrameCache negatives,String cacheScene,BiliPanel.Hint biliHint,boolean biliLaunchEligible,boolean biliPanelContext,boolean drawnPanelContext) {
+    static Data analyze(AccessibilityService.ScreenshotResult screenshot,boolean splash,String pkg,boolean jmCaption,WmSplashVisual.Hint wmHint,boolean volunteer,boolean oopzSurface,OopzLeftSkipVisual.Hint oopzLeftHint,boolean carrier,boolean canvasEligible,boolean canvasNativeAd,boolean miniProgramEligible,NegativeFrameCache negatives,String cacheScene,BiliPanel.Hint biliHint,boolean biliLaunchEligible,boolean biliPanelContext,boolean drawnPanelContext) {
         Data d=new Data();d.timestamp=screenshot.getTimestamp();long started=SystemClock.uptimeMillis();
         HardwareBuffer buffer=screenshot.getHardwareBuffer();Bitmap hardware=null,software=null,small=null;int[] pixels=null;NegativeFrameCache.Sample sampled=null;
         try {
@@ -44,10 +44,17 @@ final class VisualFrame {
                 }
             } else negatives.clear();
             String canvasReason="";
+            if(miniProgramEligible) {
+                BiliVisual.Result mini=MiniProgramSkipVisual.detect(pixels,aw,ah);
+                if(mini.found()){
+                    d.result=mini;d.miniProgramSkip=true;d.canvasSkip=true;d.kind=SplashActions.SKIP;return d;
+                }
+                canvasReason=mini.reason;
+            }
             if(splash&&canvasEligible) {
                 BiliVisual.Result canvas=CanvasSkipVisual.detect(pixels,aw,ah,canvasNativeAd);
                 if(canvas.found()){d.result=canvas;d.canvasSkip=true;d.canvasNativeAd=canvasNativeAd;d.kind=SplashActions.SKIP;return d;}
-                canvasReason=canvas.reason;
+                canvasReason=canvasReason.isEmpty()?canvas.reason:canvasReason+"；"+canvas.reason;
             }
             if(splash&&oopzSurface) {
                 d.oopzSurface=true;d.oopzLeftHint=oopzLeftHint;d.oopzCarrier=carrier;

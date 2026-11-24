@@ -40,6 +40,27 @@ public final class PanelProbeBudgetTest {
         check(rendered.ready(126,6000),"a material scene change can use the second slot");
         rendered.requested(126,6000);rendered.window(27729);
         check(!rendered.ready(88,10000),"a window change does not refill the visit budget");
+        check(rendered.state(133,10000,true)==RenderedPanelProbes.State.COOLDOWN,"late panel budget still limits rapid captures");
+        check(rendered.state(133,51000,true)==RenderedPanelProbes.State.READY,"a later Bili scan can retry after the cooldown");
+        rendered.requested(133,51000,true);
+        check(rendered.state(133,96000,true)==RenderedPanelProbes.State.READY,"stable node count does not block a later ad indefinitely");
+        rendered.requested(133,96000,true);
+        check(rendered.state(133,96001,true)==RenderedPanelProbes.State.COOLDOWN,"only one frame is renewed on the late path");
+        check(rendered.state(0,141000,true)==RenderedPanelProbes.State.NO_CONTEXT,"elapsed time alone cannot activate ordinary pages");
+        check(!rendered.ready(133,141000),"generic apps do not get the late Bili allowance");
+        rendered.markAttempt();
+        check(rendered.state(133,400000,true)==RenderedPanelProbes.State.ATTEMPTED,"elapsed time alone cannot repeat a touch in the same window");
+
+        // Two earlier frames at 01:02:53 and 01:04:11; later sample at 01:10:04.
+        rendered.reset();rendered.window(38268);
+        rendered.requested(88,1000);
+        rendered.requested(133,79000);
+        check(!rendered.ready(133,432000),"old fixed budget blocks the reported late sample");
+        check(rendered.state(133,432000,true)==RenderedPanelProbes.State.READY,"reported later event can use one bounded recheck");
+        rendered.requested(133,432000,true);
+        for(long now=433000;now<477000;now+=1000)
+            check(rendered.state(133,now,true)==RenderedPanelProbes.State.COOLDOWN,"event flood cannot refill before cooldown");
+
         rendered.reset();rendered.window(27725);rendered.markAttempt();
         check(!rendered.ready(88,11000),"the same weak panel cannot keep clicking");
         rendered.window(27729);

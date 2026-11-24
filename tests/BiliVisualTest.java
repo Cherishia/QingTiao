@@ -110,6 +110,10 @@ public final class BiliVisualTest {
         check(pair.requestDelay(1350)==100,"ordinary request is not promoted accidentally");
         System.out.println("PASS: "+checks+" visual checks");
         for(String path:args) {
+            if(path.startsWith("drawnGame:")){
+                replayDrawn(path.substring("drawnGame:".length()),851,865);
+                continue;
+            }
             if(path.startsWith("drawn:")||path.startsWith("drawnDark:")) {
                 boolean dark=path.startsWith("drawnDark:");
                 replayDrawn(path.substring(path.indexOf(':')+1),dark?872:880,dark?888:897);
