@@ -47,6 +47,10 @@ final class PanelAdLabel {
         final int x,y;
         Position(int x,int y){this.x=x;this.y=y;}
     }
+    static boolean matchesPosition(int w,int h,int headerY,int x,int y){
+        int offset=y-headerY;
+        return x>=w*.04&&x<=w*.075&&y<h&&offset>=w*.53&&offset<=w*.94;
+    }
     static Position find(int[] pixels,int width,int height,int headerY){
         int radius=Math.max(2,Math.round(width*.004f));
         int top=headerY+Math.round(width*.58f),bottom=Math.min(height-radius,headerY+Math.round(width*.94f));

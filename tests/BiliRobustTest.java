@@ -199,6 +199,29 @@ public final class BiliRobustTest {
         playing.add(new AdMatcher.Node(0,40,897,180,937,"全部评论",""));
         check(!BiliPanel.drawnTargetProblem(playing,1200,2670,1128,916,66,1774).isEmpty(),
             "an actual ordinary title aligned with the X still blocks even with ad evidence underneath");
+        List<AdMatcher.Node> rendered=new ArrayList<>();
+        rendered.add(new AdMatcher.Node(-1,0,0,1200,2670,"",""));
+        AdMatcher.Node web=new AdMatcher.Node(0,0,809,1200,2670,"","");web.className="android.webkit.WebView";rendered.add(web);
+        rendered.add(new AdMatcher.Node(0,32,821,180,911,"简介",""));
+        for(int i=0;i<22;i++)rendered.add(new AdMatcher.Node(1,32,1000,1120,1500,"",""));
+        check(RenderedAdPanel.visibleControls(rendered,1200,2670)>0&&!CanvasSkipVisual.nativeAd(rendered),
+            "current report has weak renderer context, no exposed disclosure and no watch CTA");
+        check(!RenderedAdPanel.targetProblem(rendered,1200,2670,1128,915,67,1785,true).isEmpty(),
+            "the generic broad check reproduces the reported cancellation");
+        check(BiliPanel.drawnTargetProblem(rendered,1200,2670,1128,915,67,1785).isEmpty(),
+            "two verified ad frames use the actual close title row instead of the nearby player tab");
+        check(!BiliPanel.drawnTargetProblem(rendered,1200,2670,1128,915,-1,-1).isEmpty()
+            &&!BiliPanel.drawnTargetProblem(rendered,1200,2670,1128,915,67,1400).isEmpty(),
+            "a missing or misplaced pixel disclosure keeps the broad protection");
+        rendered.add(new AdMatcher.Node(0,540,898,668,934,"评论区",""));
+        check(!BiliPanel.drawnTargetProblem(rendered,1200,2670,1128,915,67,1785).isEmpty(),
+            "a centered ordinary title on the close row blocks a touch");
+        rendered.remove(rendered.size()-1);web.visible=false;
+        check(!BiliPanel.drawnTargetProblem(rendered,1200,2670,1128,915,67,1785).isEmpty(),
+            "no current renderer and no matching native body still blocks a touch");
+        web.visible=true;rendered.get(0).password=true;
+        check(!BiliPanel.drawnTargetProblem(rendered,1200,2670,1128,915,67,1785).isEmpty(),
+            "the rendered-ad fallback still rejects sensitive current content");
         BiliVisual.Result firstPanel=new BiliVisual.Result(676,550,16,"",true,41,1064);
         BiliVisual.Result movedLabel=new BiliVisual.Result(676,550,16,"",true,41,1091);
         proof.reset();

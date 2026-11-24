@@ -159,6 +159,14 @@ public final class BiliVisualTest {
                 +" in "+(System.nanoTime()-start)/1000000+" ms");
             check(found.found()&&found.requiresPair&&Math.abs(found.x-w*.94)<w*.009&&Math.abs(found.y-h*.343)<h*.007,
                 "label-free real sheet must locate its live close icon and require a pair");
+            java.util.ArrayList<AdMatcher.Node> liveTree=new java.util.ArrayList<>();
+            liveTree.add(new AdMatcher.Node(-1,0,0,w,h,"",""));
+            AdMatcher.Node renderer=new AdMatcher.Node(0,0,h/3,w,h,"","");renderer.className="android.webkit.WebView";
+            liveTree.add(renderer);
+            liveTree.add(new AdMatcher.Node(0,w/36,found.y-w/13,w/7,found.y-2,"简介",""));
+            for(int i=0;i<12;i++)liveTree.add(new AdMatcher.Node(1,w/10,h/2,w/2,h*3/4,"",""));
+            check(BiliPanel.drawnTargetProblem(liveTree,w,h,found.x,found.y,found.adLabelX,found.adLabelY).isEmpty(),
+                "current rendered ad and its actual pixel anchors can pass the final title check");
             for(int glyph=0;glyph<2;glyph++){
                 int[] missing=pixels.clone();
                 for(int y=h*(labelTop-2)/1280;y<h*cardTop/1280;y++){

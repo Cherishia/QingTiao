@@ -68,7 +68,7 @@ final class RenderedAdPanel {
 
     private static boolean ordinaryTitleAtCloseRow(List<AdMatcher.Node> nodes,int w,int y){
         for(AdMatcher.Node n:nodes){
-            if(n.visible&&n.left>=0&&n.left<w*.23&&n.right>n.left&&n.top<=y&&n.bottom>=y
+            if(n.visible&&n.left>=0&&n.left<w*.70&&n.right<=w&&n.right>n.left&&n.top<=y&&n.bottom>=y
                 &&n.bottom-n.top<=w*.15&&Math.abs((n.top+n.bottom)/2-y)<=w*.025
                 &&(BiliPanel.ordinaryTitle(n.text)||BiliPanel.ordinaryTitle(n.desc)))return true;
         }
@@ -76,13 +76,21 @@ final class RenderedAdPanel {
     }
 
     static String targetProblem(List<AdMatcher.Node> nodes,int w,int h,int x,int y,int labelX,int labelY,boolean rendererContext){
+        return targetProblem(nodes,w,h,x,y,labelX,labelY,rendererContext,false);
+    }
+
+    static String targetProblem(List<AdMatcher.Node> nodes,int w,int h,int x,int y,int labelX,int labelY,
+                                boolean rendererContext,boolean verifiedDisclosure){
         if(nodes==null||nodes.size()>=1000||AdMatcher.sensitive(nodes))return "控件树过大或包含敏感控件";
         if(x<w*.89||x>w*.975||!headerHeight(y,h))return "关闭位置超出面板标题栏范围";
         int margin=(int)(w*.10);
-        boolean ordinary=BiliPanel.ordinaryHeader(nodes,0,y-margin,w,y+margin,w);
+        // With a verified disclosure in the sheet, a nearby background tab is not its title.
+        boolean sameRowTitle=ordinaryTitleAtCloseRow(nodes,w,y);
+        boolean ordinary=sameRowTitle||!verifiedDisclosure&&BiliPanel.ordinaryHeader(nodes,0,y-margin,w,y+margin,w);
         if(rendererContext&&!ordinary)return "";
-        if(hasAdBody(nodes,w,h,y,labelX,labelY)&&!ordinaryTitleAtCloseRow(nodes,w,y))return "";
-        return ordinary?"关闭按钮附近出现普通面板标题，广告位置未能排除重叠"
+        if(!sameRowTitle&&hasAdBody(nodes,w,h,y,labelX,labelY))return "";
+        return ordinary?(verifiedDisclosure?"与关闭图标同一标题行出现普通面板标题"
+            :"关闭按钮附近出现普通面板标题，广告位置未能排除重叠")
             :"当前控件树未保留绘制层，也未确认与画面同位置的广告标识和两处观看入口";
     }
 

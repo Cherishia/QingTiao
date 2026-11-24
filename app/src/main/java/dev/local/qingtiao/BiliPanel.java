@@ -194,7 +194,8 @@ public final class BiliPanel {
         Scope current=scope(nodes,w,h);
         if(current.competing)return "多个原生广告面板范围重叠";
         boolean context=!current.blocked&&(pixelLabelContext(nodes,current)||RenderedAdPanel.visibleControls(nodes,w,h,true)>0);
-        return RenderedAdPanel.targetProblem(nodes,w,h,x,y,labelX,labelY,context);
+        return RenderedAdPanel.targetProblem(nodes,w,h,x,y,labelX,labelY,context,
+            PanelAdLabel.matchesPosition(w,h,y,labelX,labelY));
     }
 
     public static boolean confirmTarget(List<AdMatcher.Node> nodes,int w,int h,Hint expected,int x,int y){
