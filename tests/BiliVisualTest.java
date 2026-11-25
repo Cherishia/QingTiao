@@ -110,13 +110,17 @@ public final class BiliVisualTest {
         check(pair.requestDelay(1350)==100,"ordinary request is not promoted accidentally");
         System.out.println("PASS: "+checks+" visual checks");
         for(String path:args) {
+            if(path.startsWith("drawnResume:")){
+                replayDrawn(path.substring("drawnResume:".length()),880,897,true);
+                continue;
+            }
             if(path.startsWith("drawnGame:")){
-                replayDrawn(path.substring("drawnGame:".length()),851,865);
+                replayDrawn(path.substring("drawnGame:".length()),851,865,false);
                 continue;
             }
             if(path.startsWith("drawn:")||path.startsWith("drawnDark:")) {
                 boolean dark=path.startsWith("drawnDark:");
-                replayDrawn(path.substring(path.indexOf(':')+1),dark?872:880,dark?888:897);
+                replayDrawn(path.substring(path.indexOf(':')+1),dark?872:880,dark?888:897,false);
                 continue;
             }
             boolean expected=!path.startsWith("!");if(!expected)path=path.substring(1);
@@ -143,7 +147,23 @@ public final class BiliVisualTest {
             }
         }
     }
-    private static void replayDrawn(String path,int labelTop,int cardTop)throws Exception {
+    static List<AdMatcher.Node> resumedPanelTree(int w,int h) {
+        return new java.util.ArrayList<>(Arrays.asList(
+            scaledNode(-1,w,h,0,0,1200,2670,""),
+            scaledNode(0,w,h,0,809,1200,1001,""),
+            scaledNode(1,w,h,930,844,1056,988,""),
+            scaledNode(1,w,h,1056,844,1200,988,""),
+            scaledNode(0,w,h,42,1838,90,1870,"广告"),
+            scaledNode(0,w,h,32,821,180,911,"简介")
+        ));
+    }
+    private static AdMatcher.Node scaledNode(int parent,int w,int h,int l,int t,int r,int b,String text){
+        AdMatcher.Node node=new AdMatcher.Node(parent,Math.round(l*w/1200f),Math.round(t*h/2670f),
+            Math.round(r*w/1200f),Math.round(b*h/2670f),text,"");
+        if(parent==1){node.className="android.view.View";node.clickable=true;}
+        return node;
+    }
+    private static void replayDrawn(String path,int labelTop,int cardTop,boolean resumed)throws Exception {
         BufferedImage source=ImageIO.read(new File(path));
         for(int[] display:new int[][]{{575,1280},{720,1602},{1200,2670}}) {
             int w=display[0],h=display[1];
@@ -167,6 +187,15 @@ public final class BiliVisualTest {
             for(int i=0;i<12;i++)liveTree.add(new AdMatcher.Node(1,w/10,h/2,w/2,h*3/4,"",""));
             check(BiliPanel.drawnTargetProblem(liveTree,w,h,found.x,found.y,found.adLabelX,found.adLabelY).isEmpty(),
                 "current rendered ad and its actual pixel anchors can pass the final title check");
+            if(resumed){
+                List<AdMatcher.Node> tree=resumedPanelTree(w,h);
+                check(RenderedAdPanel.visibleControls(tree,w,h,true)==0,"resume recheck models the loss of renderer context");
+                check(BiliPanel.drawnTargetProblem(tree,w,h,found.x,found.y,found.adLabelX,found.adLabelY).isEmpty(),
+                    "real resume screenshot and reported title control positions pass the final verification");
+                tree.get(2).visible=false;
+                check(!BiliPanel.drawnTargetProblem(tree,w,h,found.x,found.y,found.adLabelX,found.adLabelY).isEmpty(),
+                    "matching screenshots cannot replace the missing corroborating title control");
+            }
             for(int glyph=0;glyph<2;glyph++){
                 int[] missing=pixels.clone();
                 for(int y=h*(labelTop-2)/1280;y<h*cardTop/1280;y++){

@@ -189,13 +189,46 @@ public final class BiliPanel {
         }
         return false;
     }
+    private static boolean anonymousHeaderControl(AdMatcher.Node node,int w,int h){
+        int width=node.right-node.left,height=node.bottom-node.top;
+        return active(node)&&node.clickable&&!node.scrollable&&insideScreen(node,w,h)
+            &&"android.view.View".equals(node.className)&&(node.id==null||node.id.isEmpty())
+            &&MatchPolicy.normalize(node.text).isEmpty()&&MatchPolicy.normalize(node.desc).isEmpty()
+            &&width>=w*.06&&width<=w*.17&&height>=w*.06&&height<=w*.17;
+    }
+    /** The pixels establish what the actions mean; the current native pair establishes where they are. */
+    private static boolean drawnHeaderPair(List<AdMatcher.Node> nodes,int w,int h,int x,int y){
+        AdMatcher.Node close=null;
+        for(AdMatcher.Node n:nodes){
+            if(n.parent<0||n.parent>=nodes.size()||n.left<w*.85||n.right<w*.94
+                ||Math.abs((n.left+n.right)/2-x)>w*.03||Math.abs((n.top+n.bottom)/2-y)>w*.025
+                ||!anonymousHeaderControl(n,w,h))continue;
+            if(close!=null)return false;
+            close=n;
+        }
+        if(close==null)return false;
+        AdMatcher.Node row=nodes.get(close.parent);
+        if(!active(row)||!insideScreen(row,w,h)||!inside(close,row)||row.left>w*.12||row.right<w*.94
+            ||row.bottom-row.top>w*.23)return false;
+        int neighborCount=0;
+        for(AdMatcher.Node n:nodes){
+            if(n==close||n.parent!=close.parent||n.left<w*.70||n.left>=close.left
+                ||Math.abs(n.right-close.left)>w*.025||Math.abs(n.top-close.top)>w*.015
+                ||Math.abs(n.bottom-close.bottom)>w*.015||!inside(n,row)||!anonymousHeaderControl(n,w,h))continue;
+            if(++neighborCount>1)return false;
+        }
+        return neighborCount==1;
+    }
+
     static String drawnTargetProblem(List<AdMatcher.Node> nodes,int w,int h,int x,int y,int labelX,int labelY){
         if(!eligible(nodes,w,h))return "控件树过大、包含敏感控件或方向不适用";
         Scope current=scope(nodes,w,h);
         if(current.competing)return "多个原生广告面板范围重叠";
-        boolean context=!current.blocked&&(pixelLabelContext(nodes,current)||RenderedAdPanel.visibleControls(nodes,w,h,true)>0);
-        return RenderedAdPanel.targetProblem(nodes,w,h,x,y,labelX,labelY,context,
-            PanelAdLabel.matchesPosition(w,h,y,labelX,labelY));
+        boolean verifiedDisclosure=PanelAdLabel.matchesPosition(w,h,y,labelX,labelY);
+        boolean pairedHeader=verifiedDisclosure&&RenderedAdPanel.nativeDisclosureMatches(nodes,w,h,y,labelX,labelY)
+            &&drawnHeaderPair(nodes,w,h,x,y);
+        boolean context=pairedHeader||!current.blocked&&(pixelLabelContext(nodes,current)||RenderedAdPanel.visibleControls(nodes,w,h,true)>0);
+        return RenderedAdPanel.targetProblem(nodes,w,h,x,y,labelX,labelY,context,verifiedDisclosure);
     }
 
     public static boolean confirmTarget(List<AdMatcher.Node> nodes,int w,int h,Hint expected,int x,int y){

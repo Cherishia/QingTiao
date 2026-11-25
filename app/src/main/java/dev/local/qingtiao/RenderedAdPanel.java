@@ -38,17 +38,29 @@ final class RenderedAdPanel {
 
     static boolean headerHeight(int y,int h){return y>=h*.20&&y<=h*.50;}
 
-    /** Combine a disclosure at the same place in pixels and the tree with two current watch affordances. */
-    private static boolean hasAdBody(List<AdMatcher.Node> nodes,int w,int h,int y,int labelX,int labelY){
-        if(labelX<0||labelY<0)return false;
+    private static AdMatcher.Node matchingDisclosure(List<AdMatcher.Node> nodes,int w,int h,int y,int labelX,int labelY,boolean exact){
+        if(labelX<0||labelY<0)return null;
         AdMatcher.Node badge=null;
+        int slop=Math.max(2,w/100);
         for(AdMatcher.Node n:nodes){
             if(!bodyNode(n,w,h,y)||n.left>w*.09||n.right>w*.20||n.bottom-n.top>h*.05)continue;
             if(!(BiliPanel.adDisclosure(n.text)||BiliPanel.adDisclosure(n.desc)))continue;
-            if(Math.abs((n.left+n.right)/2-labelX)>w*.04||Math.abs((n.top+n.bottom)/2-labelY)>w*.065)continue;
-            if(badge!=null&&Math.abs(n.top-badge.top)>w*.018)return false;
+            if(exact){
+                if(labelX<n.left-slop||labelX>n.right+slop||labelY<n.top-slop||labelY>n.bottom+slop)continue;
+            }else if(Math.abs((n.left+n.right)/2-labelX)>w*.04||Math.abs((n.top+n.bottom)/2-labelY)>w*.065)continue;
+            if(badge!=null&&Math.abs(n.top-badge.top)>w*.018)return null;
             badge=n;
         }
+        return badge;
+    }
+
+    static boolean nativeDisclosureMatches(List<AdMatcher.Node> nodes,int w,int h,int y,int labelX,int labelY){
+        return matchingDisclosure(nodes,w,h,y,labelX,labelY,true)!=null;
+    }
+
+    /** Combine a disclosure at the same place in pixels and the tree with two current watch affordances. */
+    private static boolean hasAdBody(List<AdMatcher.Node> nodes,int w,int h,int y,int labelX,int labelY){
+        AdMatcher.Node badge=matchingDisclosure(nodes,w,h,y,labelX,labelY,false);
         if(badge==null)return false;
         boolean inline=false,footer=false;
         for(AdMatcher.Node n:nodes){
@@ -91,7 +103,7 @@ final class RenderedAdPanel {
         if(!sameRowTitle&&hasAdBody(nodes,w,h,y,labelX,labelY))return "";
         return ordinary?(verifiedDisclosure?"与关闭图标同一标题行出现普通面板标题"
             :"关闭按钮附近出现普通面板标题，广告位置未能排除重叠")
-            :"当前控件树未保留绘制层，也未确认与画面同位置的广告标识和两处观看入口";
+            :"当前控件树未确认绘制层或与画面位置一致的原生面板证据";
     }
 
     static BiliVisual.Result detect(int[] pixels,int w,int h){

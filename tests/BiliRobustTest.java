@@ -222,6 +222,28 @@ public final class BiliRobustTest {
         web.visible=true;rendered.get(0).password=true;
         check(!BiliPanel.drawnTargetProblem(rendered,1200,2670,1128,915,67,1785).isEmpty(),
             "the rendered-ad fallback still rejects sensitive current content");
+        List<AdMatcher.Node> resumed=BiliVisualTest.resumedPanelTree(1200,2670);
+        check(BiliPanel.drawnTargetProblem(resumed,1200,2670,1128,915,67,1855).isEmpty(),
+            "aligned native disclosure and uniquely paired header confirm the returned Bili window without its renderer or CTA");
+        check(!BiliPanel.drawnTargetProblem(resumed,1200,2670,1128,915,67,1895).isEmpty(),
+            "nearby unrelated native disclosure does not corroborate the same pixel label");
+        check(!BiliPanel.drawnTargetProblem(resumed,1200,2670,1070,915,67,1855).isEmpty(),
+            "the pixel X must agree with the center of the actual close area");
+        resumed.get(2).parent=0;
+        check(!BiliPanel.drawnTargetProblem(resumed,1200,2670,1128,915,67,1855).isEmpty(),
+            "controls from distinct title rows do not make a pair");
+        resumed.get(2).parent=1;
+        resumed.get(3).desc="分享";
+        check(!BiliPanel.drawnTargetProblem(resumed,1200,2670,1128,915,67,1855).isEmpty(),
+            "an explicit ordinary action cannot be used as an anonymous close area");
+        resumed.get(3).desc="";
+        resumed.add(resumed.get(3));
+        check(!BiliPanel.drawnTargetProblem(resumed,1200,2670,1128,915,67,1855).isEmpty(),
+            "ambiguous overlapping close candidates reject the current tree");
+        resumed.remove(resumed.size()-1);
+        resumed.add(new AdMatcher.Node(0,540,898,668,934,"评论区",""));
+        check(!BiliPanel.drawnTargetProblem(resumed,1200,2670,1128,915,67,1855).isEmpty(),
+            "a real ordinary title on the close row still vetoes the new corroboration");
         BiliVisual.Result firstPanel=new BiliVisual.Result(676,550,16,"",true,41,1064);
         BiliVisual.Result movedLabel=new BiliVisual.Result(676,550,16,"",true,41,1091);
         proof.reset();
