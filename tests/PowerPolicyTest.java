@@ -71,10 +71,33 @@ public final class PowerPolicyTest {
         check(review.requestDelay(12600,false)==380,"ordinary screenshot interval remains 450ms");
         for(int i=0;i<59;i++)review.requested(13000+i*450);
         check(review.requestDelay(40000,true)>0,"per-minute screenshot cap retained even for confirmation");
+        check(review.pairedRefreshAt(40000,39106)<0,"expired panel recovery also respects the minute cap");
+        replaySlowPanelReview();
         check(ScanPacing.watchDelay(false,true,false)<0&&ScanPacing.watchDelay(true,false,true)<0,"disabled/locked schedule has no timer wakeups");
         check(ScanPacing.watchDelay(true,true,false)>0&&ScanPacing.eventDelay(true,false,false,false)==30,"unlock/enable can rearm observation and immediate event scan");
         for(String path:args)replayImage(path);
         System.out.println("PASS: "+checks+" power-policy replay checks; quiet launch timer scans="+wakes+", idle root checks/min="+(60000/idleDue));
+    }
+    private static void replaySlowPanelReview(){
+        String owner="tv.danmaku.bili";
+        int w=1200,h=2670,window=3976;
+        BiliVisual.Result panel=new BiliVisual.Result(677,549,20,"ad panel",true,40,1071);
+        CanvasSkipVisual.Proof proof=new CanvasSkipVisual.Proof();
+        check(!proof.confirm(owner,window,0,w,h,panel,20353,20415),"first panel frame waits for confirmation");
+        check(proof.confirm(owner,window,0,w,h,panel,20697,20765),"second frame confirms before the full tree check");
+        long checkedAt=21591;
+        check(!VisualReview.currentFrame(checkedAt-proof.lastFrame(),w,h,w,h),"reported 894ms-old frame cannot authorize a touch");
+        VisualReview review=new VisualReview();
+        review.requested(20680);
+        check(review.pairedRefreshAt(checkedAt,proof.lastFrame())==checkedAt,"894ms case can request a replacement immediately");
+        check(review.pairedRefreshAt(21778,proof.lastFrame())<0,"a late scanner cannot use the old confirmation");
+        check(proof.confirm(owner,window,0,w,h,panel,21635,21700),"fresh replacement pairs with the previous matching frame");
+        check(VisualReview.currentFrame(21731-proof.lastFrame(),w,h,w,h),"example replacement remains fresh after a 31ms full check");
+        check(!proof.confirm(owner,window+1,0,w,h,panel,22000,22065),"a different real window invalidates the pair");
+        BiliVisual.Result movedLabel=new BiliVisual.Result(677,549,20,"other content",true,40,1100);
+        check(!proof.confirm(owner,window+1,0,w,h,movedLabel,22350,22415),"matching X with a shifted disclosure cannot authorize a touch");
+        proof.reset();
+        check(review.pairedRefreshAt(checkedAt,proof.lastFrame())<0,"window or settings reset clears recovery evidence");
     }
     private static void replayImage(String path)throws Exception {
         BufferedImage source=ImageIO.read(new File(path)),im=new BufferedImage(720,1602,BufferedImage.TYPE_INT_RGB);

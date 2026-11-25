@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.local.qingtiao" android:versionCode="65" android:versionName="0.5.45">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.local.qingtiao" android:versionCode="66" android:versionName="0.5.46">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
