@@ -38,13 +38,23 @@ final class RenderedAdPanel {
 
     static boolean headerHeight(int y,int h){return y>=h*.20&&y<=h*.50;}
 
+    private static boolean disclosureNode(AdMatcher.Node n,int w,int h,int y){
+        return bodyNode(n,w,h,y)&&n.left<=w*.09&&n.right<=w*.20&&n.bottom-n.top<=h*.05
+            &&(BiliPanel.adDisclosure(n.text)||BiliPanel.adDisclosure(n.desc));
+    }
+
+    static boolean hasNativeDisclosureBelow(List<AdMatcher.Node> nodes,int w,int h,int headerY){
+        for(AdMatcher.Node n:nodes)if(disclosureNode(n,w,h,headerY)
+            &&PanelAdLabel.matchesPosition(w,h,headerY,(n.left+n.right)/2,(n.top+n.bottom)/2))return true;
+        return false;
+    }
+
     private static AdMatcher.Node matchingDisclosure(List<AdMatcher.Node> nodes,int w,int h,int y,int labelX,int labelY,boolean exact){
         if(labelX<0||labelY<0)return null;
         AdMatcher.Node badge=null;
         int slop=Math.max(2,w/100);
         for(AdMatcher.Node n:nodes){
-            if(!bodyNode(n,w,h,y)||n.left>w*.09||n.right>w*.20||n.bottom-n.top>h*.05)continue;
-            if(!(BiliPanel.adDisclosure(n.text)||BiliPanel.adDisclosure(n.desc)))continue;
+            if(!disclosureNode(n,w,h,y))continue;
             if(exact){
                 if(labelX<n.left-slop||labelX>n.right+slop||labelY<n.top-slop||labelY>n.bottom+slop)continue;
             }else if(Math.abs((n.left+n.right)/2-labelX)>w*.04||Math.abs((n.top+n.bottom)/2-labelY)>w*.065)continue;

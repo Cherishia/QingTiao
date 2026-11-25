@@ -65,6 +65,9 @@ public final class PowerPolicyTest {
         check(eventDue==12530&&eventDue<22000&&eventDue<idleDue,"window event preempts sparse plan and idle timer");
         check(ScanPacing.eventDelay(false,true,true,false)==30&&ScanPacing.minimum(true)==120,"confirmed ads are not slowed by ordinary scrolling policy");
         VisualReview review=new VisualReview();review.requested(12530);check(review.requestDelay(12600,true)==280,"matched pair retains 350ms request interval");
+        check(review.pairedRequestAt(12600,12548)==12880,"prompt first capture uses the existing screenshot-rate limit");
+        check(review.pairedRequestAt(12760,12700)==13000,"delayed first capture waits for a genuinely new pair");
+        check(review.pairedRequestAt(13120,12548)==13120,"a slow first analysis does not add another fixed sleep");
         check(review.requestDelay(12600,false)==380,"ordinary screenshot interval remains 450ms");
         for(int i=0;i<59;i++)review.requested(13000+i*450);
         check(review.requestDelay(40000,true)>0,"per-minute screenshot cap retained even for confirmation");

@@ -33,7 +33,7 @@ public final class CanvasSkipVisual {
             if(same&&(word.adLabelX>=0||labelX>=0))
                 same=word.adLabelX>=0&&labelX>=0&&Math.abs(word.adLabelX-labelX)<=Math.max(4,size/2)
                     &&Math.abs(word.adLabelY-labelY)<=Math.max(4,size/2);
-            if(same&&stamp==frame)return false;boolean ready=same&&stamp-frame>=300&&stamp-frame<=1200;
+            if(same&&stamp==frame)return false;boolean ready=same&&stamp-frame>=VisualReview.MIN_PAIR_GAP&&stamp-frame<=1200;
             pkg=owner;win=window;screen=display;width=w;height=h;x=word.x;y=word.y;size=word.size;
             labelX=word.adLabelX;labelY=word.adLabelY;frame=stamp;return ready;
         }

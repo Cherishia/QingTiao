@@ -31,7 +31,9 @@ public final class BiliPanel {
         if(!eligible(nodes,w,h))return Inspection.NONE;
         Scope current=scope(nodes,w,h);
         boolean nativeEvidence=visual&&nativeEvidence(nodes,w,h,current);
-        return new Inspection(current.hint,nativeEvidence,visual&&!nativeEvidence&&pixelLabelContext(nodes,current));
+        boolean drawn=visual&&!nativeEvidence&&(pixelLabelContext(nodes,current)
+            ||!current.competing&&drawnHeaderEvidence(nodes,w,h));
+        return new Inspection(current.hint,nativeEvidence,drawn);
     }
     private static boolean active(AdMatcher.Node n){return n.visible&&n.enabled&&!n.password&&!n.editable&&!n.checkable;}
     private static boolean inside(AdMatcher.Node n,AdMatcher.Node b){return n.right>n.left&&n.bottom>n.top&&n.left>=b.left&&n.top>=b.top&&n.right<=b.right&&n.bottom<=b.bottom;}
@@ -196,28 +198,35 @@ public final class BiliPanel {
             &&MatchPolicy.normalize(node.text).isEmpty()&&MatchPolicy.normalize(node.desc).isEmpty()
             &&width>=w*.06&&width<=w*.17&&height>=w*.06&&height<=w*.17;
     }
-    /** The pixels establish what the actions mean; the current native pair establishes where they are. */
-    private static boolean drawnHeaderPair(List<AdMatcher.Node> nodes,int w,int h,int x,int y){
+    private static boolean drawnHeaderEvidence(List<AdMatcher.Node> nodes,int w,int h){
+        AdMatcher.Node header=drawnHeaderPair(nodes,w,h,-1,-1);
+        return header!=null&&RenderedAdPanel.hasNativeDisclosureBelow(nodes,w,h,(header.top+header.bottom)/2);
+    }
+
+    /** Native header geometry can start a probe; matching live pixels establish the purpose of the controls. */
+    private static AdMatcher.Node drawnHeaderPair(List<AdMatcher.Node> nodes,int w,int h,int x,int y){
         AdMatcher.Node close=null;
         for(AdMatcher.Node n:nodes){
+            int centerY=(n.top+n.bottom)/2;
             if(n.parent<0||n.parent>=nodes.size()||n.left<w*.85||n.right<w*.94
-                ||Math.abs((n.left+n.right)/2-x)>w*.03||Math.abs((n.top+n.bottom)/2-y)>w*.025
+                ||!RenderedAdPanel.headerHeight(centerY,h)
+                ||x>=0&&(Math.abs((n.left+n.right)/2-x)>w*.03||Math.abs(centerY-y)>w*.025)
                 ||!anonymousHeaderControl(n,w,h))continue;
-            if(close!=null)return false;
+            if(close!=null)return null;
             close=n;
         }
-        if(close==null)return false;
+        if(close==null)return null;
         AdMatcher.Node row=nodes.get(close.parent);
         if(!active(row)||!insideScreen(row,w,h)||!inside(close,row)||row.left>w*.12||row.right<w*.94
-            ||row.bottom-row.top>w*.23)return false;
+            ||row.bottom-row.top>w*.23)return null;
         int neighborCount=0;
         for(AdMatcher.Node n:nodes){
             if(n==close||n.parent!=close.parent||n.left<w*.70||n.left>=close.left
                 ||Math.abs(n.right-close.left)>w*.025||Math.abs(n.top-close.top)>w*.015
                 ||Math.abs(n.bottom-close.bottom)>w*.015||!inside(n,row)||!anonymousHeaderControl(n,w,h))continue;
-            if(++neighborCount>1)return false;
+            if(++neighborCount>1)return null;
         }
-        return neighborCount==1;
+        return neighborCount==1?close:null;
     }
 
     static String drawnTargetProblem(List<AdMatcher.Node> nodes,int w,int h,int x,int y,int labelX,int labelY){
@@ -226,7 +235,7 @@ public final class BiliPanel {
         if(current.competing)return "多个原生广告面板范围重叠";
         boolean verifiedDisclosure=PanelAdLabel.matchesPosition(w,h,y,labelX,labelY);
         boolean pairedHeader=verifiedDisclosure&&RenderedAdPanel.nativeDisclosureMatches(nodes,w,h,y,labelX,labelY)
-            &&drawnHeaderPair(nodes,w,h,x,y);
+            &&drawnHeaderPair(nodes,w,h,x,y)!=null;
         boolean context=pairedHeader||!current.blocked&&(pixelLabelContext(nodes,current)||RenderedAdPanel.visibleControls(nodes,w,h,true)>0);
         return RenderedAdPanel.targetProblem(nodes,w,h,x,y,labelX,labelY,context,verifiedDisclosure);
     }

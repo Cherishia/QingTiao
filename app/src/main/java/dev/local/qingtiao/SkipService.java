@@ -114,7 +114,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
     private boolean forceTreeRead;
     private boolean weakStartupEvidenceSeen;
     private interface FrameReader {VisualFrame.Data read(ScreenshotResult screenshot,boolean fullDiscovery);}
-    private static final int FULL=0,CANVAS_PAIR=1,BILI_LAUNCH_PAIR=2,BILI_PANEL_PAIR=3,JM_CLOCK=4;
+    private static final int FULL=0,CANVAS_PAIR=1,BILI_LAUNCH_PAIR=2,BILI_PANEL_PAIR=3,JM_CLOCK=4,BILI_RENDERED_PAIR=5;
     /** Immutable detector inputs only: no pixels, nodes or coordinates for an action. */
     private static final class CapturePlan {
         final String pkg;final boolean splash,strongSurfaceDiscovery;final int generation,window,display;final Point size;final FrameReader reader;
@@ -161,7 +161,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
         prefs=getSharedPreferences(LocalLog.PREFS,0);prefs.registerOnSharedPreferenceChangeListener(this);
         connected=true;instance=this;refreshExclusions();
         ServiceRecovery.connected(this);
-        serviceVersion="0.5.44";sessionStarted=new java.text.SimpleDateFormat("MM-dd HH:mm:ss",java.util.Locale.CHINA).format(new java.util.Date());
+        serviceVersion="0.5.45";sessionStarted=new java.text.SimpleDateFormat("MM-dd HH:mm:ss",java.util.Locale.CHINA).format(new java.util.Date());
         AccessibilityServiceInfo info=getServiceInfo();
         frameAccess=canReadFrames(info);
         if(info!=null) {
@@ -183,7 +183,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             receiverRegistered=true;
         }
         prefs.edit().putLong("service_ui",SystemClock.elapsedRealtimeNanos()).apply();
-        LocalLog.add(this,"JUMP 0.5.44 服务已连接 · "+connectionDetails+" · Android "+Build.VERSION.RELEASE+" · "+Build.MANUFACTURER+" "+Build.MODEL);
+        LocalLog.add(this,"JUMP 0.5.45 服务已连接 · "+connectionDetails+" · Android "+Build.VERSION.RELEASE+" · "+Build.MANUFACTURER+" "+Build.MODEL);
     }
     /** The home screen invokes this only after the user confirms disabling the service. */
     static boolean disableAccessibilityFromHome() {
@@ -481,11 +481,16 @@ public final class SkipService extends AccessibilityService implements SharedPre
     private boolean runLightProbe(){
         if(lightProbe==null)return false;
         CapturePlan plan=lightProbe;int lane=lightLane;long now=SystemClock.uptimeMillis();
-        if(forceTreeRead||busy||pending!=null||plan.generation!=generation||!plan.pkg.equals(foreground)||!visualEnabled(plan.pkg,plan.splash)){
+        // A rendered Bili pair reads the live window before capture and a fresh full tree before touching.
+        if(forceTreeRead&&lane!=BILI_RENDERED_PAIR||busy||pending!=null||plan.generation!=generation
+            ||!plan.pkg.equals(foreground)||!visualEnabled(plan.pkg,plan.splash)){
             lightProbe=null;return false;
         }
         long delay=Math.max(lightProbeAt-now,pixelDelay(now));
-        if(delay>0){queue(delay);return true;}
+        if(delay>0){
+            if(lane==BILI_RENDERED_PAIR)queueKnownRead(now,now+delay,false);else queue(delay);
+            return true;
+        }
         lightProbe=null;
         if(!visualWindow(plan.pkg,plan.window,plan.display,plan.size,false,false,false)){
             if(lane==JM_CLOCK)timedClose.clear("轻量取帧时窗口或显示区域变化");
@@ -496,7 +501,8 @@ public final class SkipService extends AccessibilityService implements SharedPre
     private void scheduleLightProbe(CapturePlan plan,int lane,long due,long now){
         // No extra capture budget: use the same scanner queue and the same capture rate limits.
         lightProbe=plan;lightLane=lane;lightProbeAt=due;
-        queueWindow(Math.max(0,due-now),false);
+        if(lane==BILI_RENDERED_PAIR)queueKnownRead(now,due,false);
+        else queueWindow(Math.max(0,due-now),false);
     }
     private void observeForeground(String pkg,int windowId,long now) {
         oopzOrigin.foreground(pkg,now,wmTouchReview.attempts());
@@ -512,7 +518,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             capturingVisual=false;visualReview.clearScene();timedClose.clear();splashActions.reset();wmTouchReview.reset();delayedWatch.reset();picaSequence=false;visualKind=SplashActions.NONE;visualPackage="";startupProbe.reset(now);
             douyuAdSeen=false;
             if("air.tv.douyu.android".equals(pkg)) {
-                actionPackage=pkg;actionDiagnostic="JUMP 0.5.44\n应用："+pkg+"，窗口="+windowId+"\n斗鱼启动采样，尚未提交本应用的点击动作";
+                actionPackage=pkg;actionDiagnostic="JUMP 0.5.45\n应用："+pkg+"，窗口="+windowId+"\n斗鱼启动采样，尚未提交本应用的点击动作";
                 prefs.edit().putString("action_trace",actionDiagnostic).apply();
             }
         }
@@ -636,7 +642,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             if(reminder.present)adActiveUntil=reminder.index>=0&&prefs.getBoolean("gesture_retry",true)&&gate.allows(fingerprint(pkg,snapshot.get(reminder.index)),now)?now+2000:0;
             else if(pending==null&&!visualFollowup.active(now)&&!pixelPairPending)adActiveUntil=0;
             if("tv.danmaku.bili".equals(pkg)&&AdMatcher.biliAdHint(snapshot)&&!pkg.equals(actionPackage)&&pending==null) {
-                actionPackage=pkg;actionDiagnostic="JUMP 0.5.44\n应用："+pkg+"，窗口="+root.getWindowId()+"\n读到广告相关内容，尚未提交本应用的点击动作";
+                actionPackage=pkg;actionDiagnostic="JUMP 0.5.45\n应用："+pkg+"，窗口="+root.getWindowId()+"\n读到广告相关内容，尚未提交本应用的点击动作";
                 prefs.edit().putString("action_trace",actionDiagnostic).apply();
             }
             traceBase=snapshotTrace(pkg,snapshot,choices,size,startupProbe.active(now),reminder,splash)+"\n当前窗口ID="+root.getWindowId()
@@ -700,7 +706,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             if(explicitLabel&&!gestureAllowed) {trace(pkg,"明确跳过广告标签需要模拟触摸，但此开关已关闭，未点击",false);return;}
             now=SystemClock.uptimeMillis();gate.record(fingerprint(pkg,node),now);busy=true;
             pending=new Pending(pkg,fingerprint(pkg,node),traceBase,root.getWindowId(),now,target,dismissMode,nativeSplash,nativePauseTarget);
-            actionPackage=pkg;actionDiagnostic="JUMP 0.5.44\n应用："+pkg+"，窗口="+root.getWindowId()
+            actionPackage=pkg;actionDiagnostic="JUMP 0.5.45\n应用："+pkg+"，窗口="+root.getWindowId()
                 +"\n目标位置="+current.toShortString();
             if(dismissMode)actionDiagnostic+="\n目标方式=关闭模式提醒弹窗，仅触摸明确中性按钮";
             else if(timerGesture)actionDiagnostic+="\n目标方式=当前全屏广告图与右上角倒计时标签核验，直接触摸标签";
@@ -1047,7 +1053,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
             while(visualSteps.size()>16)visualSteps.removeFirst();
         }
         StringBuilder steps=new StringBuilder();for(String step:visualSteps)steps.append('\n').append(step);
-        visualDiagnostic="JUMP 0.5.44 · "+(visualSplash?"开屏画面识别":"本地广告面板识别")+"\n应用："+visualPackage+"\n"+message+"\n最近画面过程："+steps;
+        visualDiagnostic="JUMP 0.5.45 · "+(visualSplash?"开屏画面识别":"本地广告面板识别")+"\n应用："+visualPackage+"\n"+message+"\n最近画面过程："+steps;
         // Snapshot encoding and persistence are batched by trace; action records stay immediate.
         traceInteresting=visualInteresting;trace(visualPackage,"画面识别："+message,false);
     }
@@ -1341,7 +1347,8 @@ public final class SkipService extends AccessibilityService implements SharedPre
             resetPixelProofs();endVisualFollowup("复查仍匹配广告面板图形");visualStatus("B站暂停广告：仍匹配面板图形，本次已尝试，停止重复点击");return;
         }
         if(result.found()&&(lane==CANVAS_PAIR&&!frame.canvasSkip||lane==BILI_LAUNCH_PAIR&&!frame.biliLaunch
-            ||lane==BILI_PANEL_PAIR&&(frame.biliLaunch||!result.requiresPair)||lane==JM_CLOCK&&!frame.timedClose)){
+            ||lane==BILI_PANEL_PAIR&&(frame.biliLaunch||!result.requiresPair)||lane==BILI_RENDERED_PAIR&&!frame.renderedPanel
+            ||lane==JM_CLOCK&&!frame.timedClose)){
             resetPixelProofs();visualStatus("轻量复查目标类型已变化，等待完整扫描；未点击");queueVisualRetry();return;
         }
         if(!splash&&result.found()&&result.requiresPair) {
@@ -1351,7 +1358,9 @@ public final class SkipService extends AccessibilityService implements SharedPre
             if(!proof.confirm(pkg,windowId,display,frame.width,frame.height,result,frame.timestamp,now)) {
                 pixelPairPending=true;visualStatus(result.reason+"；等待第二张同窗口新画面，图形分析="+frame.analysisMs+"ms");
                 burstUntil=Math.max(burstUntil,now+1500);
-                if(lane==FULL)scheduleLightProbe(plan,frame.biliLaunch?BILI_LAUNCH_PAIR:BILI_PANEL_PAIR,now+Math.max(120,pixelDelay(now)),now);
+                if(lane==FULL&&frame.renderedPanel&&"tv.danmaku.bili".equals(pkg))
+                    scheduleLightProbe(plan,BILI_RENDERED_PAIR,visualReview.pairedRequestAt(now,frame.timestamp),now);
+                else if(lane==FULL)scheduleLightProbe(plan,frame.biliLaunch?BILI_LAUNCH_PAIR:BILI_PANEL_PAIR,now+Math.max(120,pixelDelay(now)),now);
                 else queue(Math.max(120,pixelDelay(now)));return;
             }
         } else {biliPairProof.reset();renderedPairProof.reset();}
@@ -1485,7 +1494,7 @@ public final class SkipService extends AccessibilityService implements SharedPre
         if(frame.renderedPanel)renderProbes.markAttempt();
         if(frame.timedClose&&DelayedAdWatch.jm(pkg))timedClose.clear("已提交红X动作，下一帧只作结果观察");
         if(frame.wmHint!=null)wmTouchReview.mark(pkg,windowId,display,frame.wmHint,wordX,wordY,frame.timestamp,now);
-        if(!wmRetry) {actionPackage=pkg;actionDiagnostic="JUMP 0.5.44\n应用："+pkg+"，窗口="+windowId
+        if(!wmRetry) {actionPackage=pkg;actionDiagnostic="JUMP 0.5.45\n应用："+pkg+"，窗口="+windowId
             +"\n目标方式="+(splash?(frame.kind==SplashActions.PICA_NOTICE?"哔咔第"+splashActions.noticeCount()+"条公告，不再顯示":frame.kind==SplashActions.PICA_CLOSE?"哔咔开屏，左上角白色圆圈X已出现":frame.timedClose?"广告计时结束后关闭当前红X，不重复等待":frame.circularSkip?"本地匹配当前圆环与跳过两字":"本地匹配开屏‘跳过’字形"):frame.biliLaunch?"B站全屏开屏：两帧核验右下跳过和倒计时":"本地像素识别广告面板X，即时点击")+"\n实际目标中心=("+x+","+y+")";}
         if(wmRetry)actionStep(pkg,"WM_RETRY_CONFIRMED：已重新取得当前窗口="+windowId+"的SDK控件和两张连续新画面；剩余预算内补一次触摸，不复用旧窗口目标；位置=("+x+","+y+")");
         actionStep(actionPackage,"VISUAL_CONFIRMED："+(splash?"已复查开屏广告上下文；":frame.biliLaunch?"已复查当前开屏窗口及两帧右下跳过目标；":"当前帧广告面板特征匹配，无需等待前往观看；")+detail);

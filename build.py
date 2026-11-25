@@ -16,7 +16,7 @@ def main():
     parser.add_argument('--java-home', default=os.environ.get('JAVA_HOME'))
     parser.add_argument('--build-tools', required=True)
     parser.add_argument('--android-jar', required=True)
-    parser.add_argument('--out', default=str(ROOT.parent/'QingTiao-0.5.44.apk'))
+    parser.add_argument('--out', default=str(ROOT.parent/'QingTiao-0.5.45.apk'))
     parser.add_argument('--build-dir', default=str(ROOT/'build'))
     args=parser.parse_args()
     if not args.java_home: parser.error('--java-home or JAVA_HOME is required')

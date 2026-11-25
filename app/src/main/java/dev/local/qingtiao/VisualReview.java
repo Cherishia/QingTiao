@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 
 /** A fresh complete panel pattern allows one immediate touch, with bounded capture rate. */
 public final class VisualReview {
+    static final long MIN_PAIR_GAP=300;
     public enum Action { NO_TARGET, READY, ALREADY_ATTEMPTED }
     private long lastRequest=-10000;
     private boolean attempted;
@@ -19,6 +20,9 @@ public final class VisualReview {
         return wait;
     }
     public void requested(long now){lastRequest=now;requests.addLast(now);}
+    long pairedRequestAt(long now,long firstFrame){
+        return Math.max(firstFrame+MIN_PAIR_GAP,now+requestDelay(now,true));
+    }
     public Action observe(boolean found) {
         if(!found){clearScene();return Action.NO_TARGET;}
         if(attempted)return Action.ALREADY_ATTEMPTED;

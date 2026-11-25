@@ -223,6 +223,18 @@ public final class BiliRobustTest {
         check(!BiliPanel.drawnTargetProblem(rendered,1200,2670,1128,915,67,1785).isEmpty(),
             "the rendered-ad fallback still rejects sensitive current content");
         List<AdMatcher.Node> resumed=BiliVisualTest.resumedPanelTree(1200,2670);
+        check(BiliPanel.inspect(resumed,1200,2670,true).pixelLabelContext,
+            "a current ad disclosure and paired header immediately enter the existing panel probe budget");
+        check(!BiliPanel.inspect(resumed,1200,2670,false).pixelLabelContext,
+            "the same native evidence respects the visual setting");
+        resumed.get(4).visible=false;
+        check(!BiliPanel.inspect(resumed,1200,2670,true).pixelLabelContext,
+            "ordinary unlabelled toolbar cannot trigger the early panel probe");
+        resumed.get(4).visible=true;
+        resumed.get(2).parent=0;
+        check(!BiliPanel.inspect(resumed,1200,2670,true).pixelLabelContext,
+            "the disclosure alone cannot trigger the early panel probe");
+        resumed.get(2).parent=1;
         check(BiliPanel.drawnTargetProblem(resumed,1200,2670,1128,915,67,1855).isEmpty(),
             "aligned native disclosure and uniquely paired header confirm the returned Bili window without its renderer or CTA");
         check(!BiliPanel.drawnTargetProblem(resumed,1200,2670,1128,915,67,1895).isEmpty(),
